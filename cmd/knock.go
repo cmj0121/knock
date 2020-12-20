@@ -1,7 +1,7 @@
 package main
 
 import (
-	"knock"
+	"github.com/cmj0121/knock"
 )
 
 func main() {
