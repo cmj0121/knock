@@ -8,6 +8,7 @@ import (
 
 	"github.com/cmj0121/argparse"
 	"github.com/cmj0121/logger"
+	"gopkg.in/yaml.v3"
 )
 
 // the knock interface
@@ -20,6 +21,8 @@ type Knock struct {
 
 	Port string  `short:"s" help:"port (INT), port list  (INT,INT) or port range (INT-INT)"`
 	IP   *string `help:"ip address (STR), ip list (STR,STR) or ip with mask (STR/INT)"`
+
+	*Info `help:"show self net info"`
 }
 
 func New() (knock *Knock) {
@@ -45,10 +48,12 @@ func (knock *Knock) ParseAndRun() {
 	}
 
 	knock.Logger.SetLevel(knock.LogLevel)
-	knock.Info("start run %v", PROJ_NAME)
+	knock.Logger.Info("start run %v", PROJ_NAME)
 
 	ports := []int{}
 	switch {
+	case knock.Port == "":
+		// not set the port number
 	case RE_PORT_LIST.MatchString(knock.Port):
 		for _, p := range strings.Split(knock.Port, ",") {
 			if port, err := strconv.Atoi(p); err != nil {
@@ -97,6 +102,18 @@ func (knock *Knock) ParseAndRun() {
 		panic(err)
 	}
 	knock.Debug("scan port #%v ports", len(ports))
+
+	switch {
+	case knock.Info != nil:
+		knock.Info.Load()
+		if data, err := yaml.Marshal(knock.Info); err != nil {
+			knock.Logger.Warn("cannot marshal info")
+			return
+		} else {
+			// show on the STDOUT
+			os.Stdout.Write(data)
+		}
+	}
 
 	return
 }
