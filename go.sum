@@ -1,9 +1,0 @@
-github.com/cmj0121/argparse v0.5.3 h1:EaPw8Y/vHq/YPKnJfx9IUAR0cLyagBkcTGX+9aJQUBk=
-github.com/cmj0121/argparse v0.5.3/go.mod h1:MJZURHuGfUudCyY37n/hPSs2gD+pHd07foZ3/Xallok=
-github.com/cmj0121/logger v1.2.1 h1:uBugba2f7GocZ0nXSZJPp2iNIYWdVdsj2f2Pq4uGyR4=
-github.com/cmj0121/logger v1.2.1/go.mod h1:N9vkhQgq34KIbnPLc9NMcCoA7AL95CBEVG0Mi5hpFsA=
-github.com/cmj0121/logger v1.2.2 h1:ROtl6vRaYTRyugR0MCmSVQQ8U4XMfTWcaU15jnwOeEA=
-github.com/cmj0121/logger v1.2.2/go.mod h1:qaqPLFd6UBNSb4r/KJL12cn/lqHb1inqeivLzEhlI1I=
-gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
-gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 h1:tQIYjPdBoyREyB9XMu+nnTclpTYkz2zFM+lzLJFO4gQ=
-gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=

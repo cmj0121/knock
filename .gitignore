@@ -1,1 +1,6 @@
 *.sw[po]
+
+cmd/*
+!cmd/*.go
+
+go.sum

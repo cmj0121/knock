@@ -2,6 +2,7 @@ package knock
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ type Knock struct {
 	// the internal logger
 	*logger.Logger `-`
 	LogLevel       string `name:"log" choices:"warn info debug verbose" help:"log level"`
+	IFace          net.Interface
 
 	Port string  `short:"s" help:"port (INT), port list  (INT,INT) or port range (INT-INT)"`
 	IP   *string `help:"ip address (STR), ip list (STR,STR) or ip with mask (STR/INT)"`
@@ -50,7 +52,24 @@ func (knock *Knock) ParseAndRun() {
 	knock.Logger.SetLevel(knock.LogLevel)
 	knock.Logger.Info("start run %v", PROJ_NAME)
 
-	ports := []int{}
+	knock.MustValidator()
+
+	switch {
+	case knock.Info != nil:
+		knock.Info.Load()
+		if data, err := yaml.Marshal(knock.Info); err != nil {
+			knock.Logger.Warn("cannot marshal info")
+			return
+		} else {
+			// show on the STDOUT
+			os.Stdout.Write(data)
+		}
+	}
+
+	return
+}
+
+func (knock *Knock) MustValidator() (ports []int) {
 	switch {
 	case knock.Port == "":
 		// not set the port number
@@ -102,18 +121,6 @@ func (knock *Knock) ParseAndRun() {
 		panic(err)
 	}
 	knock.Debug("scan port #%v ports", len(ports))
-
-	switch {
-	case knock.Info != nil:
-		knock.Info.Load()
-		if data, err := yaml.Marshal(knock.Info); err != nil {
-			knock.Logger.Warn("cannot marshal info")
-			return
-		} else {
-			// show on the STDOUT
-			os.Stdout.Write(data)
-		}
-	}
 
 	return
 }
