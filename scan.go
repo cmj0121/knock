@@ -29,7 +29,7 @@ type Scan struct {
 
 	IFace *net.Interface `args:"option"`
 
-	IPs *[]string `help:"scan IP list"`
+	IP *[]string `help:"scan IP list"`
 }
 
 func (scan *Scan) Run(log *logger.Logger) {
@@ -78,6 +78,13 @@ func (scan *Scan) Run(log *logger.Logger) {
 
 	// receive the packet on the goroutine
 	go scan.Recv(ctx, handler)
+	for ip := range scan.ListIP(ctx) {
+		// send the ARP request
+		scan.sendARP(handler, scan.IFace, ip)
+	}
+
+	// always wait few seconds
+	time.Sleep(time.Second * 5)
 }
 
 // receive the packet and save the result
@@ -96,17 +103,21 @@ func (scan *Scan) Recv(ctx context.Context, handler *pcap.Handle) {
 		case pkg := <-in:
 			// receive packet
 			scan.Debug("receive packet: %v", pkg)
+
+			if target := scan.recvARP(pkg); target != nil {
+				scan.Crit("recv target: %v", target)
+			}
 		}
 	}
 }
 
-// list the possible IP list, set iface net if scan.IPs is empty
+// list the possible IP list, set iface net if scan.IP is empty
 func (scan *Scan) ListIP(ctx context.Context) (ch <-chan net.IP) {
 	tmp := make(chan net.IP, 1)
 
-	scan.Info("scan ip list: #%v", scan.IPs)
+	scan.Info("scan ip list: #%v", scan.IP)
 	go func() {
-		if scan.IPs == nil {
+		if scan.IP == nil {
 			// list all subnet in the iface
 			addrs, err := scan.IFace.Addrs()
 			if err != nil {
