@@ -3,7 +3,9 @@ package knock
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"net"
+	"os"
 	"time"
 
 	"github.com/cmj0121/argparse"
@@ -11,6 +13,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -23,13 +26,16 @@ type Scan struct {
 
 	*logger.Logger `-`
 
-	Timeout    int   `help:"set timeout on all run"`
-	IPv6       bool  `help:"scan IPv6 only"`
-	MaxPkgSize int32 `help:"maximal packet size"`
+	Format     string `short:"f" choices:"yaml json" help:"output format"`
+	Timeout    int    `help:"set timeout on all run"`
+	IPv6       bool   `help:"scan IPv6 only"`
+	MaxPkgSize int32  `help:"maximal packet size"`
 
 	IFace *net.Interface `args:"option"`
 
 	IP *[]string `help:"scan IP list"`
+
+	Targets []*Target
 }
 
 func (scan *Scan) Run(log *logger.Logger) {
@@ -84,7 +90,26 @@ func (scan *Scan) Run(log *logger.Logger) {
 	}
 
 	// always wait few seconds
-	time.Sleep(time.Second * 5)
+	time.Sleep(TASK_WAIT_SECONDS)
+
+	// show the output and show in the STDOUT
+	switch scan.Format {
+	case "yaml":
+		data, err := yaml.Marshal(scan.Targets)
+		if err != nil {
+			scan.Warn("cannot marshal as %#v: %v", scan.Format, err)
+		}
+		os.Stdout.Write(data)
+	case "json":
+		data, err := json.Marshal(scan.Targets)
+		if err != nil {
+			scan.Warn("cannot marshal as %#v: %v", scan.Format, err)
+		}
+		os.Stdout.Write(data)
+	default:
+		scan.Crit("not implement format: %#v", scan.Format)
+		return
+	}
 }
 
 // receive the packet and save the result
@@ -105,7 +130,8 @@ func (scan *Scan) Recv(ctx context.Context, handler *pcap.Handle) {
 			scan.Debug("receive packet: %v", pkg)
 
 			if target := scan.recvARP(pkg); target != nil {
-				scan.Crit("recv target: %v", target)
+				// append to the result
+				scan.Targets = append(scan.Targets, target)
 			}
 		}
 	}

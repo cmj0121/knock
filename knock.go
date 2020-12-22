@@ -32,6 +32,8 @@ func New() (knock *Knock) {
 		Scan: &Scan{
 			MaxPkgSize: MAX_PACKAGE_SIZE,
 			Timeout:    60,
+			Format:     "yaml",
+			Targets:    []*Target{},
 		},
 	}
 	return

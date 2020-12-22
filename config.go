@@ -3,6 +3,7 @@ package knock
 import (
 	"fmt"
 	"regexp"
+	"time"
 )
 
 const (
@@ -21,4 +22,9 @@ func Version() (ver string) {
 var (
 	RE_PORT_LIST  = regexp.MustCompile(`^\d+(?:,\d+)*$`)
 	RE_PORT_RANGE = regexp.MustCompile(`^\d+\-\d+$`)
+)
+
+const (
+	// the global wait seconds when task finished, for receive the pending response
+	TASK_WAIT_SECONDS = time.Second * 4
 )
