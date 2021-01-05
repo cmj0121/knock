@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"net"
 	"os"
+
+	"github.com/cmj0121/argparse"
 )
 
 type Info struct {
-	Hostname string
-	IFaces   map[string]string
+	argparse.Help
+
+	Hostname string              `args:"-"`
+	IFaces   map[string][]string `args:"-"`
 }
 
 func (info *Info) Load() {
@@ -20,16 +24,16 @@ func (info *Info) Load() {
 	}
 
 	// ---- get all interfaces info ----
-	info.IFaces = map[string]string{}
+	info.IFaces = map[string][]string{}
 	if ifaces, err := net.Interfaces(); err == nil {
 		for _, iface := range ifaces {
 			if addrs, err := iface.Addrs(); err == nil {
 				for _, addr := range addrs {
 					switch addr.(type) {
 					case *net.IPNet:
-						info.IFaces[iface.Name] = addr.String()
+						info.IFaces[iface.Name] = append(info.IFaces[iface.Name], addr.String())
 					case *net.IPAddr:
-						info.IFaces[iface.Name] = addr.String()
+						info.IFaces[iface.Name] = append(info.IFaces[iface.Name], addr.String())
 					}
 				}
 			}
