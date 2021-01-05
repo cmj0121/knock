@@ -26,16 +26,16 @@ type Scan struct {
 
 	*logger.Logger `-`
 
-	Format     string `short:"f" choices:"yaml json" help:"output format"`
-	Timeout    int    `help:"set timeout on all run"`
+	Format     string `short:"f" default:"yaml" choices:"yaml json" help:"output format"`
+	Timeout    int    `default:"60" help:"set timeout on all run"`
 	IPv6       bool   `help:"scan IPv6 only"`
-	MaxPkgSize int32  `help:"maximal packet size"`
+	MaxPkgSize int32  `default:"65536" help:"maximal packet size"`
 
 	IFace *net.Interface `args:"option"`
 
 	IP *[]string `help:"scan IP list"`
 
-	Targets []*Target
+	Targets []*Target `-`
 }
 
 func (scan *Scan) Run(log *logger.Logger) {
@@ -70,6 +70,7 @@ func (scan *Scan) Run(log *logger.Logger) {
 	}
 
 	// open PCAP handle for packet R/W (blocking)
+	scan.Info("scan the iface: %#v", scan.IFace.Name)
 	handler, err := pcap.OpenLive(scan.IFace.Name, scan.MaxPkgSize, true, pcap.BlockForever)
 	if err != nil {
 		scan.Crit("open PCAP handler: %v", err)
