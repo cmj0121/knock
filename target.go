@@ -1,9 +1,9 @@
 package knock
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
-	"encoding/json"
 
 	"github.com/google/gopacket"
 )

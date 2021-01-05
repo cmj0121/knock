@@ -1,5 +1,6 @@
 .PHONY: all clean help
 
+SRC := $(shell find . -name '*.go')
 BIN := $(subst .go,,$(wildcard cmd/*.go))
 
 all: $(BIN) linter	# build all binary
@@ -19,9 +20,12 @@ GOFLAG  := -ldflags="-s -w"
 GOTEST  := $(GO) test -cover -failfast -timeout 2s
 GOBENCH := $(GO) test -bench=. -cover -failfast -benchmem
 
-linter:
+linter: .benchmark
 	$(GOFMT) $(shell find . -name '*.go')
 	$(GOTEST) ./...
+
+.benchmark: $(SRC)
+	touch $@
 	$(GOBENCH)
 
 $(BIN): linter
