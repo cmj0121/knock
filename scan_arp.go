@@ -66,6 +66,7 @@ func (scan *Scan) recvARP(pkg gopacket.Packet) (target *Target) {
 				IP:           net.IP(pkg_arp.SourceProtAddress),
 				HardwareAddr: net.HardwareAddr(pkg_arp.SourceHwAddress),
 			}
+			target.LoadHostname()
 		}
 	}
 

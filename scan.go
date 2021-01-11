@@ -10,6 +10,7 @@ import (
 
 	"github.com/cmj0121/argparse"
 	"github.com/cmj0121/logger"
+	"github.com/cmj0121/table"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -26,7 +27,7 @@ type Scan struct {
 
 	*logger.Logger `-`
 
-	Format     string `short:"f" default:"yaml" choices:"yaml json" help:"output format"`
+	Format     string `short:"f" default:"table" choices:"table yaml json" help:"output format"`
 	Timeout    int    `default:"60" help:"set timeout on all run"`
 	IPv6       bool   `help:"scan IPv6 only"`
 	MaxPkgSize int32  `default:"65536" help:"maximal packet size"`
@@ -95,6 +96,12 @@ func (scan *Scan) Run(log *logger.Logger) {
 
 	// show the output and show in the STDOUT
 	switch scan.Format {
+	case "table":
+		data, err := table.Marshal(scan.Targets)
+		if err != nil {
+			scan.Warn("cannot marshal as %#v: %v", scan.Format, err)
+		}
+		os.Stdout.Write(data)
 	case "yaml":
 		data, err := yaml.Marshal(scan.Targets)
 		if err != nil {

@@ -18,13 +18,11 @@ type Target struct {
 }
 
 func (target *Target) String() (str string) {
-	target.loadHostname()
 	str = fmt.Sprintf("%v %v %-16v (%v)", target.LayerType, target.Hostname, target.IP, target.HardwareAddr)
 	return
 }
 
 func (target *Target) MarshalYAML() (out interface{}, err error) {
-	target.loadHostname()
 	out = map[string]string{
 		"layer":    target.LayerType.String(),
 		"MAC":      target.HardwareAddr.String(),
@@ -35,8 +33,6 @@ func (target *Target) MarshalYAML() (out interface{}, err error) {
 }
 
 func (target *Target) MarshalJSON() (out []byte, err error) {
-	target.loadHostname()
-
 	out, err = json.Marshal(map[string]string{
 		"layer":    target.LayerType.String(),
 		"MAC":      target.HardwareAddr.String(),
@@ -46,7 +42,7 @@ func (target *Target) MarshalJSON() (out []byte, err error) {
 	return
 }
 
-func (target *Target) loadHostname() {
+func (target *Target) LoadHostname() {
 	if target.Hostname == "" || target.Hostname == "?" {
 		if hostnames, err := net.LookupAddr(target.IP.String()); err == nil && len(hostnames) > 0 {
 			// get hostname from IP
