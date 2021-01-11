@@ -7,7 +7,6 @@ import (
 
 	"github.com/cmj0121/argparse"
 	"github.com/cmj0121/logger"
-	"gopkg.in/yaml.v3"
 )
 
 type Info struct {
@@ -47,15 +46,10 @@ func (info *Info) Load() {
 	return
 }
 
-func (info *Info) Run(log *logger.Logger) {
+func (info *Info) Run(log *logger.Logger) (result interface{}) {
 	info.Logger = log
 
 	info.Load()
-	if data, err := yaml.Marshal(info); err != nil {
-		info.Logger.Warn("cannot marshal info")
-		return
-	} else {
-		// show on the STDOUT
-		os.Stdout.Write(data)
-	}
+	result = info
+	return
 }

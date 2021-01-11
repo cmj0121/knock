@@ -21,7 +21,7 @@ type Web struct {
 	Timeout int    `default:"4" help:"timeout"`
 }
 
-func (web *Web) Run(log *logger.Logger) {
+func (web *Web) Run(log *logger.Logger) (result interface{}) {
 	web.Logger = log
 
 	client := &http.Client{
@@ -43,6 +43,7 @@ func (web *Web) Run(log *logger.Logger) {
 		}
 	}
 
+	return
 }
 
 func (web *Web) Scan(client *http.Client, URL string) {
