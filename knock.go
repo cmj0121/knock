@@ -33,6 +33,7 @@ type Knock struct {
 	*Info `help:"show self net info"`
 	*Scan `help:"run raw scan"`
 	*Web  `help:"scan the web information"`
+	*DNS  `help:"scan the DNS record"`
 }
 
 func New() (knock *Knock) {
@@ -69,6 +70,8 @@ func (knock *Knock) ParseAndRun() {
 		runner = knock.Web
 	case knock.Scan != nil:
 		runner = knock.Scan
+	case knock.DNS != nil:
+		runner = knock.DNS
 	default:
 		parser.HelpMessage(nil)
 		return
