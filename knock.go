@@ -18,7 +18,7 @@ type KnockRunner interface {
 
 // the knock interface
 type Knock struct {
-	argparse.Help
+	argparse.Model
 
 	// the internal logger
 	*logger.Logger `-`

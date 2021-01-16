@@ -1,7 +1,8 @@
-.PHONY: all clean help
+.PHONY: all clean help install
 
 SRC := $(shell find . -name '*.go')
 BIN := $(subst .go,,$(wildcard cmd/*.go))
+
 
 all: $(BIN) linter	# build all binary
 
@@ -13,6 +14,10 @@ help:		# show this message
 	@printf "\n"
 	@perl -nle 'print $$& if m{^[\w-]+:.*?#.*$$}' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?#"} {printf "    %-18s %s\n", $$1, $$2}'
+
+PREFIX := /usr/local/bin
+install: $(BIN)	# install the binary to the PREFIX
+	install -m755 $^ $(PREFIX)/
 
 GO      := go
 GOFMT   := $(GO)fmt -w -s
