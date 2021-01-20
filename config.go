@@ -26,5 +26,5 @@ var (
 
 const (
 	// the global wait seconds when task finished, for receive the pending response
-	TASK_WAIT_SECONDS = time.Second * 4
+	TASK_WAIT_SECONDS = time.Second * 10
 )
