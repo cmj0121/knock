@@ -19,8 +19,13 @@ PREFIX := /usr/local/bin
 install: $(BIN)	# install the binary to the PREFIX
 	install -m755 $^ $(PREFIX)/
 
-GO      := go
-GOFMT   := $(GO)fmt -w -s
+ifeq ($(shell go version|grep -oE 1.16),1.16)
+GO := go
+else ifneq ($(shell ls ~/go/bin/ | grep 1.16 | head -n1),"")
+GO := ~/go/bin/$(shell ls ~/go/bin | grep 1.16 | head -n1)
+endif
+## FIXME - should be used the $(GO)
+GOFMT   := gofmt -w -s
 GOFLAG  := -ldflags="-s -w"
 GOTEST  := $(GO) test -cover -failfast -timeout 2s
 GOBENCH := $(GO) test -bench=. -cover -failfast -benchmem
