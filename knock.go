@@ -1,24 +1,24 @@
 package knock
 
 import (
-	"encoding/json"
+	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/cmj0121/argparse"
 	"github.com/cmj0121/logger"
-	"github.com/cmj0121/table"
-	"gopkg.in/yaml.v3"
 )
 
-type KnockRunner interface {
-	Run(*logger.Logger) interface{}
-}
-
-// the knock interface
+// the knock interface which provide the global setting
 type Knock struct {
 	argparse.Model
+
+	sync.Mutex `-`
 
 	// the internal logger
 	*logger.Logger `-`
@@ -30,20 +30,40 @@ type Knock struct {
 	// number of worker, default #CPU
 	NumWorker int `short:"w" name:"worker" help:"number of worker"`
 
-	*Info `help:"show self net info"`
-	*Scan `help:"run raw scan"`
-	*Web  `help:"scan the web information"`
-	*DNS  `help:"scan the DNS record"`
+	// default word-list
+	WordListFile *os.File `short:"W" name:"word-list" args:"option" help:"default system-wide word-list"`
+
+	// the global timeout based on seconds
+	Timeuot int `short:"t" help:"global timeout based on seconds"`
+
+	*Demo `help:"list all the word-list"`
+
+	/* ---- private fields */
+	receiver chan Response
+	wg       sync.WaitGroup
 }
 
+// new the knock instance with default config
 func New() (knock *Knock) {
 	knock = &Knock{
 		Logger:    logger.New(PROJ_NAME),
 		NumWorker: runtime.NumCPU(),
+		Timeuot:   60,
+
+		// NOTE - #Reducer Buffer=16
+		receiver: make(chan Response, 16),
 	}
 	return
 }
 
+// show the knock version info
+func (knock *Knock) Version(parser *argparse.ArgParse) (exit bool) {
+	os.Stdout.WriteString(Version() + "\n")
+	exit = true
+	return
+}
+
+// parse from the command-line and execute the knock
 func (knock *Knock) ParseAndRun() {
 	parser := argparse.MustNew(knock)
 	argparse.RegisterCallback(argparse.FN_VERSION, knock.Version)
@@ -62,55 +82,105 @@ func (knock *Knock) ParseAndRun() {
 	knock.Logger.SetLevel(knock.LogLevel)
 	knock.Logger.Info("start run %v", PROJ_NAME)
 
-	var runner KnockRunner
+	/* ---- runner ---- */
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(knock.Timeuot)*time.Second)
+	defer cancel()
+
+	var runner Runner
+
 	switch {
-	case knock.Info != nil:
-		runner = knock.Info
-	case knock.Web != nil:
-		runner = knock.Web
-	case knock.Scan != nil:
-		runner = knock.Scan
-	case knock.DNS != nil:
-		runner = knock.DNS
+	case knock.Demo != nil:
+		runner = knock.Demo
 	default:
-		parser.HelpMessage(nil)
 		return
 	}
 
-	switch result := runner.Run(knock.Logger); result.(type) {
-	case nil:
-	default:
-		// show the output and show in the STDOUT
-		switch knock.Format {
-		case "table":
-			data, err := table.Marshal(result)
-			if err != nil {
-				knock.Warn("cannot marshal as %#v: %v", knock.Format, err)
-			}
-			os.Stdout.Write(data)
-		case "yaml":
-			data, err := yaml.Marshal(result)
-			if err != nil {
-				knock.Warn("cannot marshal as %#v: %v", knock.Format, err)
-			}
-			os.Stdout.Write(data)
-		case "json":
-			data, err := json.Marshal(result)
-			if err != nil {
-				knock.Warn("cannot marshal as %#v: %v", knock.Format, err)
-			}
-			os.Stdout.Write(data)
-		default:
-			knock.Crit("not implement format: %#v", knock.Format)
-			return
-		}
+	/* ---- runner ---- */
+	// fork all the runner
+	broker := knock.WordList(ctx)
+	for i := 0; i < knock.NumWorker; i++ {
+		// run on the goroutine
+		knock.wg.Add(1)
+		go func() {
+			defer knock.wg.Done()
+			runner.Run(broker, knock.receiver)
+		}()
 	}
 
+	// close the receiver if all runner closed
+	go func() {
+		knock.wg.Wait()
+		knock.Info("stop the reducer")
+		close(knock.receiver)
+	}()
+
+	/* ---- reducer ---- */
+	knock.Logger.Debug("start the reducer")
+	cnt := 0
+	progress := []string{"|", "/", "-", "\\"}
+
+	for {
+		if resp, ok := <-knock.receiver; !ok {
+			knock.Logger.Info("stop reducer")
+			break
+		} else {
+			// show the message to the console
+			switch resp.Type {
+			case RESP_PROGRESS:
+				msg := fmt.Sprintf("\x1b[2K\x1b[1000D.................................... %v %v", progress[cnt], resp.Message)
+				os.Stdout.WriteString(msg)
+				cnt = (cnt + 1) % len(progress)
+			case RESP_RESULT:
+				os.Stdout.WriteString(fmt.Sprintf("%v\n", resp.Message))
+			default:
+				os.Stdout.WriteString(fmt.Sprintf("[Unknown #%d] %v\n", resp.Type, resp.Message))
+			}
+		}
+	}
+	os.Stdout.WriteString("\nFinished.\n")
 	return
 }
 
-func (knock *Knock) Version(parser *argparse.ArgParse) (exit bool) {
-	os.Stdout.WriteString(Version() + "\n")
-	exit = true
+// list of the word-list
+func (knock *Knock) WordList(ctx context.Context) (ch <-chan string) {
+	tmp := make(chan string, 1)
+
+	// make sure always only one work scanner
+	go func() {
+		knock.Lock()
+		defer knock.Unlock()
+
+		var scanner *bufio.Scanner
+
+		switch {
+		case knock.WordListFile == nil:
+			// load the default word lists
+			knock.Logger.Info("load the default word-list")
+			scanner = bufio.NewScanner(strings.NewReader(wordlists))
+		default:
+			knock.Logger.Info("load the customized word-list: %#v", knock.WordListFile.Name())
+			scanner = bufio.NewScanner(knock.WordListFile)
+		}
+
+		// load the str
+		for scanner.Scan() {
+			select {
+			case <-ctx.Done():
+				close(tmp)
+				return
+			default:
+				text := scanner.Text()
+				tmp <- text
+			}
+		}
+		close(tmp)
+		return
+	}()
+
+	ch = tmp
 	return
+}
+
+type Runner interface {
+	Run(broker <-chan string, receiver chan<- Response)
 }

@@ -2,15 +2,15 @@ package knock
 
 import (
 	"fmt"
-	"regexp"
-	"time"
+
+	_ "embed"
 )
 
 const (
 	PROJ_NAME = "knock"
 
-	MAJOR = 0
-	MINOR = 1
+	MAJOR = 1
+	MINOR = 0
 	MACRO = 0
 )
 
@@ -20,11 +20,23 @@ func Version() (ver string) {
 }
 
 var (
-	RE_PORT_LIST  = regexp.MustCompile(`^\d+(?:,\d+)*$`)
-	RE_PORT_RANGE = regexp.MustCompile(`^\d+\-\d+$`)
+	//go:embed assets/wordlists
+	wordlists string
 )
 
+type ResponseType int
+
 const (
-	// the global wait seconds when task finished, for receive the pending response
-	TASK_WAIT_SECONDS = time.Second * 10
+	RESP_ERR = iota
+	RESP_PROGRESS
+	RESP_RESULT
 )
+
+// the response when send the request from the Knock
+type Response struct {
+	// message type
+	Type ResponseType
+
+	// the message of the response
+	Message string
+}
