@@ -40,3 +40,8 @@ type Response struct {
 	// the message of the response
 	Message string
 }
+
+// the runner that receive the word-list from broker and reply the response to receiver
+type Runner interface {
+	Run(broker <-chan string, receiver chan<- Response)
+}

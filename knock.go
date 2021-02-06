@@ -37,6 +37,7 @@ type Knock struct {
 	Timeuot int `short:"t" help:"global timeout based on seconds"`
 
 	*Demo `help:"list all the word-list"`
+	*Info `help:"show the current system info"`
 
 	/* ---- private fields */
 	receiver chan Response
@@ -91,6 +92,8 @@ func (knock *Knock) ParseAndRun() {
 	switch {
 	case knock.Demo != nil:
 		runner = knock.Demo
+	case knock.Info != nil:
+		runner = knock.Info
 	default:
 		return
 	}
@@ -110,34 +113,12 @@ func (knock *Knock) ParseAndRun() {
 	// close the receiver if all runner closed
 	go func() {
 		knock.wg.Wait()
-		knock.Info("stop the reducer")
+		knock.Logger.Info("stop the reducer")
 		close(knock.receiver)
 	}()
 
 	/* ---- reducer ---- */
-	knock.Logger.Debug("start the reducer")
-	cnt := 0
-	progress := []string{"|", "/", "-", "\\"}
-
-	for {
-		if resp, ok := <-knock.receiver; !ok {
-			knock.Logger.Info("stop reducer")
-			break
-		} else {
-			// show the message to the console
-			switch resp.Type {
-			case RESP_PROGRESS:
-				msg := fmt.Sprintf("\x1b[2K\x1b[1000D.................................... %v %v", progress[cnt], resp.Message)
-				os.Stdout.WriteString(msg)
-				cnt = (cnt + 1) % len(progress)
-			case RESP_RESULT:
-				os.Stdout.WriteString(fmt.Sprintf("%v\n", resp.Message))
-			default:
-				os.Stdout.WriteString(fmt.Sprintf("[Unknown #%d] %v\n", resp.Type, resp.Message))
-			}
-		}
-	}
-	os.Stdout.WriteString("\nFinished.\n")
+	knock.Reducer()
 	return
 }
 
@@ -181,6 +162,36 @@ func (knock *Knock) WordList(ctx context.Context) (ch <-chan string) {
 	return
 }
 
-type Runner interface {
-	Run(broker <-chan string, receiver chan<- Response)
+func (knock *Knock) Reducer() {
+	knock.Logger.Debug("start the reducer")
+	cnt := 0
+	progress := []string{"|", "/", "-", "\\"}
+
+	newline := false
+	for {
+		if resp, ok := <-knock.receiver; !ok {
+			knock.Logger.Info("stop reducer")
+			break
+		} else {
+			// show the message to the console
+			switch resp.Type {
+			case RESP_PROGRESS:
+				msg := fmt.Sprintf("\x1b[2K\x1b[1000D.................................... %v %v", progress[cnt], resp.Message)
+				os.Stdout.WriteString(msg)
+				cnt = (cnt + 1) % len(progress)
+				newline = true
+			case RESP_RESULT:
+				os.Stdout.WriteString(fmt.Sprintf("\x1b[2K\x1b[1000D%v\n", resp.Message))
+				newline = false
+			default:
+				os.Stdout.WriteString(fmt.Sprintf("[Unknown #%d] %v\n", resp.Type, resp.Message))
+				newline = false
+			}
+		}
+	}
+
+	if newline {
+		// show the extra NEWLINE
+		os.Stdout.WriteString("\n")
+	}
 }
