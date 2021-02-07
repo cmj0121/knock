@@ -2,6 +2,7 @@ package knock
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"sync"
 )
@@ -10,7 +11,7 @@ type Info struct {
 	sync.Once `-`
 }
 
-func (info *Info) Run(broker <-chan string, receiver chan<- Response) {
+func (info *Info) Run(receiver chan<- Response, broker <-chan string) {
 	// just do exactly once, no matter how many worker
 	info.Once.Do(func() {
 		if ifaces, err := net.Interfaces(); err == nil {
@@ -42,4 +43,10 @@ func (info *Info) showIface(receiver chan<- Response, iface net.Interface) {
 			}
 		}
 	}
+}
+
+// does not provide the customized word-list
+func (info *Info) Reader() (r io.Reader) {
+	r = nil
+	return
 }

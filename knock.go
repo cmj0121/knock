@@ -8,10 +8,12 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cmj0121/argparse"
 	"github.com/cmj0121/logger"
+	"github.com/mattn/go-isatty"
 )
 
 // the knock interface which provide the global setting
@@ -22,18 +24,12 @@ type Knock struct {
 	*logger.Logger `-`
 	LogLevel       string `name:"log" choices:"warn info debug verbose" help:"log level"`
 
-	// the display format
-	Format string `short:"f" default:"yaml" choices:"table yaml json" help:"output format"`
-
 	// number of worker, default #CPU
 	NumWorker int `short:"w" name:"worker" help:"number of worker"`
 
-	// default word-list
-	WordListFile *os.File  `short:"W" name:"word-list" args:"option" help:"default system-wide word-list"`
-	WordReader   io.Reader `-`
-
 	// the global timeout based on seconds
 	Timeuot int `short:"t" help:"global timeout based on seconds"`
+	Wait    int `help:"wait ms per each task"`
 
 	*Demo `help:"list all the word-list"`
 	*Info `help:"show the current system info"`
@@ -49,9 +45,6 @@ func New() (knock *Knock) {
 		Logger:    logger.New(PROJ_NAME),
 		NumWorker: runtime.NumCPU(),
 		Timeuot:   60,
-
-		// default word-lists
-		WordReader: strings.NewReader(wordlists),
 
 		// NOTE - #Reducer Buffer=16
 		receiver: make(chan Response, 16),
@@ -85,17 +78,11 @@ func (knock *Knock) ParseAndRun() {
 	knock.Logger.SetLevel(knock.LogLevel)
 	knock.Logger.Info("start run %v", PROJ_NAME)
 
-	if knock.WordListFile != nil {
-		knock.Logger.Debug("load the customized word-lists: %#v", knock.WordListFile.Name())
-		knock.WordReader = knock.WordListFile
-	}
-
 	/* ---- runner ---- */
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(knock.Timeuot)*time.Second)
 	defer cancel()
 
 	var runner Runner
-
 	switch {
 	case knock.Demo != nil:
 		runner = knock.Demo
@@ -105,15 +92,22 @@ func (knock *Knock) ParseAndRun() {
 		return
 	}
 
+	knock.Logger.Debug("use runner: %T", runner)
+	reader := runner.Reader()
+	if reader == nil {
+		knock.Logger.Info("load the default word-lists")
+		reader = strings.NewReader(wordlists)
+	}
+
 	/* ---- runner ---- */
 	// fork all the runner
-	broker := knock.WordList(ctx, knock.WordReader)
+	broker := knock.WordList(ctx, reader)
 	for i := 0; i < knock.NumWorker; i++ {
 		// run on the goroutine
 		knock.wg.Add(1)
 		go func() {
 			defer knock.wg.Done()
-			runner.Run(broker, knock.receiver)
+			runner.Run(knock.receiver, broker)
 		}()
 	}
 
@@ -135,20 +129,22 @@ func (knock *Knock) WordList(ctx context.Context, r io.Reader) (ch <-chan string
 
 	// make sure always only one work scanner
 	go func() {
+		defer close(tmp)
 		scanner := bufio.NewScanner(r)
 
 		// load the str
 		for scanner.Scan() {
 			select {
 			case <-ctx.Done():
-				close(tmp)
 				return
 			default:
 				text := scanner.Text()
 				tmp <- text
+				// wait ?ms per each word list generated
+				time.Sleep(time.Duration(knock.Wait) * time.Millisecond)
 			}
 		}
-		close(tmp)
+
 		return
 	}()
 
@@ -156,12 +152,15 @@ func (knock *Knock) WordList(ctx context.Context, r io.Reader) (ch <-chan string
 	return
 }
 
+// receive the response from runner and show the result on STDOUT
 func (knock *Knock) Reducer() {
 	knock.Logger.Debug("start the reducer")
 	cnt := 0
 	progress := []string{"|", "/", "-", "\\"}
 
 	newline := false
+	isTerm := isatty.IsTerminal(os.Stdout.Fd())
+	isStderrTerm := isatty.IsTerminal(os.Stderr.Fd())
 	for {
 		if resp, ok := <-knock.receiver; !ok {
 			knock.Logger.Info("stop reducer")
@@ -170,13 +169,27 @@ func (knock *Knock) Reducer() {
 			// show the message to the console
 			switch resp.Type {
 			case RESP_PROGRESS:
-				msg := fmt.Sprintf("\x1b[2K\x1b[1000D.................................... %v %v", progress[cnt], resp.Message)
-				os.Stdout.WriteString(msg)
-				cnt = (cnt + 1) % len(progress)
-				newline = true
+				switch {
+				case isTerm:
+					msg := fmt.Sprintf("\x1b[2K\x1b[1000D................................. %v %v", progress[cnt], resp.Message)
+					os.Stdout.WriteString(msg)
+					cnt = (cnt + 1) % len(progress)
+					newline = true
+				case isStderrTerm:
+					msg := fmt.Sprintf("\x1b[2K\x1b[1000D................................. %v %v", progress[cnt], resp.Message)
+					os.Stderr.WriteString(msg)
+					cnt = (cnt + 1) % len(progress)
+					newline = true
+				}
 			case RESP_RESULT:
-				os.Stdout.WriteString(fmt.Sprintf("\x1b[2K\x1b[1000D%v\n", resp.Message))
-				newline = false
+				switch {
+				case isTerm:
+					os.Stdout.WriteString(fmt.Sprintf("\x1b[2K\x1b[1000D%v\n", resp.Message))
+					newline = false
+				default:
+					os.Stdout.WriteString(fmt.Sprintf("%v\n", resp.Message))
+					newline = false
+				}
 			default:
 				os.Stdout.WriteString(fmt.Sprintf("[Unknown #%d] %v\n", resp.Type, resp.Message))
 				newline = false
@@ -184,8 +197,13 @@ func (knock *Knock) Reducer() {
 		}
 	}
 
-	if newline {
-		// show the extra NEWLINE
-		os.Stdout.WriteString("\n")
+	// show the extra NEWLINE
+	switch {
+	case isTerm:
+		if newline {
+			os.Stdout.WriteString("\n")
+		}
+	case isStderrTerm:
+		os.Stderr.WriteString("\n")
 	}
 }

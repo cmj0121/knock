@@ -2,6 +2,7 @@ package knock
 
 import (
 	"fmt"
+	"io"
 
 	_ "embed"
 )
@@ -43,5 +44,8 @@ type Response struct {
 
 // the runner that receive the word-list from broker and reply the response to receiver
 type Runner interface {
-	Run(broker <-chan string, receiver chan<- Response)
+	// the runner task by one receiver and one broker
+	Run(receiver chan<- Response, broker <-chan string)
+	// the customized word-list
+	Reader() io.Reader
 }
