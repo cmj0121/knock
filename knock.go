@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cmj0121/argparse"
@@ -17,8 +17,6 @@ import (
 // the knock interface which provide the global setting
 type Knock struct {
 	argparse.Model
-
-	sync.Mutex `-`
 
 	// the internal logger
 	*logger.Logger `-`
@@ -31,7 +29,8 @@ type Knock struct {
 	NumWorker int `short:"w" name:"worker" help:"number of worker"`
 
 	// default word-list
-	WordListFile *os.File `short:"W" name:"word-list" args:"option" help:"default system-wide word-list"`
+	WordListFile *os.File  `short:"W" name:"word-list" args:"option" help:"default system-wide word-list"`
+	WordReader   io.Reader `-`
 
 	// the global timeout based on seconds
 	Timeuot int `short:"t" help:"global timeout based on seconds"`
@@ -50,6 +49,9 @@ func New() (knock *Knock) {
 		Logger:    logger.New(PROJ_NAME),
 		NumWorker: runtime.NumCPU(),
 		Timeuot:   60,
+
+		// default word-lists
+		WordReader: strings.NewReader(wordlists),
 
 		// NOTE - #Reducer Buffer=16
 		receiver: make(chan Response, 16),
@@ -83,6 +85,11 @@ func (knock *Knock) ParseAndRun() {
 	knock.Logger.SetLevel(knock.LogLevel)
 	knock.Logger.Info("start run %v", PROJ_NAME)
 
+	if knock.WordListFile != nil {
+		knock.Logger.Debug("load the customized word-lists: %#v", knock.WordListFile.Name())
+		knock.WordReader = knock.WordListFile
+	}
+
 	/* ---- runner ---- */
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(knock.Timeuot)*time.Second)
 	defer cancel()
@@ -100,7 +107,7 @@ func (knock *Knock) ParseAndRun() {
 
 	/* ---- runner ---- */
 	// fork all the runner
-	broker := knock.WordList(ctx)
+	broker := knock.WordList(ctx, knock.WordReader)
 	for i := 0; i < knock.NumWorker; i++ {
 		// run on the goroutine
 		knock.wg.Add(1)
@@ -123,25 +130,12 @@ func (knock *Knock) ParseAndRun() {
 }
 
 // list of the word-list
-func (knock *Knock) WordList(ctx context.Context) (ch <-chan string) {
+func (knock *Knock) WordList(ctx context.Context, r io.Reader) (ch <-chan string) {
 	tmp := make(chan string, 1)
 
 	// make sure always only one work scanner
 	go func() {
-		knock.Lock()
-		defer knock.Unlock()
-
-		var scanner *bufio.Scanner
-
-		switch {
-		case knock.WordListFile == nil:
-			// load the default word lists
-			knock.Logger.Info("load the default word-list")
-			scanner = bufio.NewScanner(strings.NewReader(wordlists))
-		default:
-			knock.Logger.Info("load the customized word-list: %#v", knock.WordListFile.Name())
-			scanner = bufio.NewScanner(knock.WordListFile)
-		}
+		scanner := bufio.NewScanner(r)
 
 		// load the str
 		for scanner.Scan() {
