@@ -33,6 +33,7 @@ type Knock struct {
 
 	*Demo `help:"list all the word-list"`
 	*Info `help:"show the current system info"`
+	*Scan
 
 	/* ---- private fields */
 	receiver chan Response
@@ -79,18 +80,27 @@ func (knock *Knock) ParseAndRun() {
 	knock.Logger.Info("start run %v", PROJ_NAME)
 
 	/* ---- runner ---- */
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(knock.Timeuot)*time.Second)
-	defer cancel()
-
 	var runner Runner
 	switch {
 	case knock.Demo != nil:
 		runner = knock.Demo
 	case knock.Info != nil:
 		runner = knock.Info
+	case knock.Scan != nil:
+		runner = knock.Scan
 	default:
+		knock.Logger.Crit("not specified runner")
 		return
 	}
+
+	if err := runner.Open(); err != nil {
+		knock.Logger.Crit("cannot open runner %T: %v", runner, err)
+		return
+	}
+	defer runner.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(knock.Timeuot)*time.Second)
+	defer cancel()
 
 	knock.Logger.Debug("use runner: %T", runner)
 	reader := runner.Reader()

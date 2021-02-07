@@ -44,8 +44,13 @@ type Response struct {
 
 // the runner that receive the word-list from broker and reply the response to receiver
 type Runner interface {
+	// open/close the runner
+	Open() error
+	Close() error
+
 	// the runner task by one receiver and one broker
 	Run(receiver chan<- Response, broker <-chan string)
+
 	// the customized word-list
 	Reader() io.Reader
 }

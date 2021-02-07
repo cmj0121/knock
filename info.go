@@ -11,6 +11,16 @@ type Info struct {
 	sync.Once `-`
 }
 
+func (info *Info) Open() (err error) {
+	err = nil
+	return
+}
+
+func (info *Info) Close() (err error) {
+	err = nil
+	return
+}
+
 func (info *Info) Run(receiver chan<- Response, broker <-chan string) {
 	// just do exactly once, no matter how many worker
 	info.Once.Do(func() {

@@ -8,6 +8,16 @@ import (
 type Demo struct {
 }
 
+func (demo *Demo) Open() (err error) {
+	err = nil
+	return
+}
+
+func (demo *Demo) Close() (err error) {
+	err = nil
+	return
+}
+
 func (demo *Demo) Run(receiver chan<- Response, broker <-chan string) {
 	for {
 		msg, ok := <-broker
