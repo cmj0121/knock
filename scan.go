@@ -22,7 +22,7 @@ type Scan struct {
 	stop         chan struct{} `-`
 
 	RTT        int            `default:"4000" help:"the maximal assumption RTT in ms"`
-	IFace      *net.Interface `args:"option" help:"scan on specified iface"`
+	IFace      *net.Interface `args:"option" short:"i" help:"scan on specified iface"`
 	MaxPkgSize int32          `short:"P" name:"pkg-size" default:"65536" help:"maximal packet size"`
 
 	// IP meta
@@ -219,14 +219,19 @@ func (scan *Scan) RecvPkg(receiver chan<- Response) {
 				switch pkg_arp.Operation {
 				case layers.ARPReply:
 					ip := net.IP(pkg_arp.SourceProtAddress).String()
-					hostname, _ := net.LookupAddr(ip)
+					hostnames, _ := net.LookupAddr(ip)
+					hostname := "<UNKNOWN>"
+					if len(hostnames) > 0 {
+						// load the first possible hostname
+						hostname = hostnames[0]
+					}
 					receiver <- Response{
 						Type: RESP_RESULT,
 						Message: fmt.Sprintf(
 							"%-8s %-22v %-22v (%v)",
 							layers.LayerTypeARP,
 							ip,
-							hostname[0], // show the first possible hostname
+							hostname, // show the first possible hostname
 							net.HardwareAddr(pkg_arp.SourceHwAddress),
 						),
 					}
