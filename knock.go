@@ -33,7 +33,7 @@ type Knock struct {
 
 	*Demo `help:"list all the word-list"`
 	*Info `help:"show the current system info"`
-	*Scan
+	*Scan `help:"scan via network protocol"`
 
 	/* ---- private fields */
 	receiver chan Response
@@ -211,9 +211,9 @@ func (knock *Knock) Reducer() {
 	switch {
 	case isTerm:
 		if newline {
-			os.Stdout.WriteString("\n")
+			os.Stdout.WriteString("\x1b[2K\x1b[1000D\n")
 		}
 	case isStderrTerm:
-		os.Stderr.WriteString("\n")
+		os.Stderr.WriteString("\x1b[2K\x1b[1000D\n")
 	}
 }

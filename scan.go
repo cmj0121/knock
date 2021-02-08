@@ -19,7 +19,7 @@ type Scan struct {
 
 	sync.Once    `-`
 	*pcap.Handle `-`
-	stop         bool
+	stop         chan struct{} `-`
 
 	RTT        int            `default:"4000" help:"the maximal assumption RTT in ms"`
 	IFace      *net.Interface `args:"option" help:"scan on specified iface"`
@@ -70,12 +70,17 @@ func (scan *Scan) Open() (err error) {
 		return
 	}
 
-	scan.stop = false
+	scan.stop = make(chan struct{}, 1)
+	switch {
+	case scan.ARP:
+	default:
+		scan.ARP = true
+	}
 	return
 }
 
 func (scan *Scan) Close() (err error) {
-	scan.stop = true
+	close(scan.stop)
 	scan.Handle.Close()
 	return
 }
@@ -86,50 +91,69 @@ func (scan *Scan) Run(receiver chan<- Response, broker <-chan string) {
 		go scan.RecvPkg(receiver)
 	})
 
-	for {
-		ip, ok := <-broker
-		if !ok {
-			// end-of-task
-			break
+	if addrs, err := scan.IFace.Addrs(); err == nil {
+		var srcIP net.IP
+
+		for _, addr := range addrs {
+			if inet, ok := addr.(*net.IPNet); ok {
+				if scan.IPNet.Contains(inet.IP) {
+					srcIP = inet.IP
+					break
+				}
+			}
 		}
 
-		// build the ARP request
-		pkg_eth := layers.Ethernet{
-			SrcMAC:       scan.IFace.HardwareAddr,
-			DstMAC:       net.HardwareAddr{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
-			EthernetType: layers.EthernetTypeARP,
-		}
-		pkg_arp := layers.ARP{
-			AddrType:          layers.LinkTypeEthernet,
-			Protocol:          layers.EthernetTypeIPv4,
-			HwAddressSize:     6,
-			ProtAddressSize:   4,
-			Operation:         layers.ARPRequest,
-			SourceHwAddress:   []byte(scan.IFace.HardwareAddr),
-			SourceProtAddress: []byte(net.ParseIP(ip)),
-			DstHwAddress:      []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		}
-		// raw packet
-		pkg := gopacket.NewSerializeBuffer()
-		pkg_opts := gopacket.SerializeOptions{
-			FixLengths:       true,
-			ComputeChecksums: true,
-		}
+		for {
+			ip, ok := <-broker
+			if !ok {
+				// end-of-task
+				break
+			}
 
-		pkg_arp.DstProtAddress = []byte(ip)
-		gopacket.SerializeLayers(pkg, pkg_opts, &pkg_eth, &pkg_arp)
-		if err := scan.Handle.WritePacketData(pkg.Bytes()); err != nil {
+			// build the ARP request
+			pkg_eth := layers.Ethernet{
+				SrcMAC:       scan.IFace.HardwareAddr,
+				DstMAC:       net.HardwareAddr{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+				EthernetType: layers.EthernetTypeARP,
+			}
+			pkg_arp := layers.ARP{
+				AddrType:          layers.LinkTypeEthernet,
+				Protocol:          layers.EthernetTypeIPv4,
+				HwAddressSize:     6,
+				ProtAddressSize:   4,
+				Operation:         layers.ARPRequest,
+				SourceHwAddress:   []byte(scan.IFace.HardwareAddr),
+				SourceProtAddress: []byte(srcIP.To4()),
+				DstHwAddress:      []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			}
+			// raw packet
+			pkg := gopacket.NewSerializeBuffer()
+			pkg_opts := gopacket.SerializeOptions{
+				FixLengths:       true,
+				ComputeChecksums: true,
+			}
+
+			pkg_arp.DstProtAddress = []byte(net.ParseIP(ip).To4())
+			if err := gopacket.SerializeLayers(pkg, pkg_opts, &pkg_eth, &pkg_arp); err != nil {
+				// show the progress
+				receiver <- Response{
+					Type:    RESP_PROGRESS,
+					Message: fmt.Sprintf("cannot build pkg: %v", err),
+				}
+				return
+			} else if err := scan.Handle.WritePacketData(pkg.Bytes()); err != nil {
+				// show the progress
+				receiver <- Response{
+					Type:    RESP_PROGRESS,
+					Message: fmt.Sprintf("cannot send pkg: %v", err),
+				}
+				return
+			}
 			// show the progress
 			receiver <- Response{
 				Type:    RESP_PROGRESS,
-				Message: fmt.Sprintf("cannot send pkg: %v", err),
+				Message: ip,
 			}
-			return
-		}
-		// show the progress
-		receiver <- Response{
-			Type:    RESP_PROGRESS,
-			Message: ip,
 		}
 	}
 
@@ -179,21 +203,33 @@ func (scan *Scan) Read(p []byte) (n int, err error) {
 func (scan *Scan) RecvPkg(receiver chan<- Response) {
 	src := gopacket.NewPacketSource(scan.Handle, layers.LayerTypeEthernet)
 	in := src.Packets()
-	for !scan.stop {
-		pkg := <-in
 
-		if arp_layer := pkg.Layer(layers.LayerTypeARP); scan.ARP && arp_layer != nil {
-			// receive ARP packet
-			pkg_arp := arp_layer.(*layers.ARP)
-			switch pkg_arp.Operation {
-			case layers.ARPReply:
-				receiver <- Response{
-					Type: RESP_RESULT,
-					Message: fmt.Sprintf(
-						"%4s %v %v",
-						layers.LayerTypeARP,
-						net.IP(pkg_arp.SourceProtAddress), net.HardwareAddr(pkg_arp.SourceHwAddress),
-					),
+	for {
+		select {
+		case <-scan.stop:
+			return
+		case pkg := <-in:
+			arp_layer := pkg.Layer(layers.LayerTypeARP)
+
+			switch {
+			case scan.ARP && arp_layer != nil:
+				// receive ARP packet
+				pkg_arp := arp_layer.(*layers.ARP)
+
+				switch pkg_arp.Operation {
+				case layers.ARPReply:
+					ip := net.IP(pkg_arp.SourceProtAddress).String()
+					hostname, _ := net.LookupAddr(ip)
+					receiver <- Response{
+						Type: RESP_RESULT,
+						Message: fmt.Sprintf(
+							"%-8s %-22v %-22v (%v)",
+							layers.LayerTypeARP,
+							ip,
+							hostname[0], // show the first possible hostname
+							net.HardwareAddr(pkg_arp.SourceHwAddress),
+						),
+					}
 				}
 			}
 		}
