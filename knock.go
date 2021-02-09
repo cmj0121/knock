@@ -25,7 +25,8 @@ type Knock struct {
 	LogLevel       string `name:"log" choices:"warn info debug verbose" help:"log level"`
 
 	// number of worker, default #CPU
-	NumWorker int `short:"w" name:"worker" help:"number of worker"`
+	NumWorker int    `short:"w" name:"worker" help:"number of worker"`
+	WordList  string `short:"W" choices:"wordlists usernames passwords" help:"default word-lists"`
 
 	// the global timeout based on seconds
 	Timeuot int `short:"t" help:"global timeout based on seconds"`
@@ -105,13 +106,23 @@ func (knock *Knock) ParseAndRun() {
 	knock.Logger.Debug("use runner: %T", runner)
 	reader := runner.Reader()
 	if reader == nil {
-		knock.Logger.Info("load the default word-lists")
-		reader = strings.NewReader(wordlists)
+		knock.Logger.Info("load the default word-lists: %v", knock.WordList)
+		switch knock.WordList {
+		case "wordlists":
+			reader = strings.NewReader(wordlists)
+		case "usernames":
+			reader = strings.NewReader(usernames)
+		case "passwords":
+			reader = strings.NewReader(passwords)
+		default:
+			knock.Logger.Crit("not supported default word-lists: %#v", knock.WordList)
+			return
+		}
 	}
 
 	/* ---- runner ---- */
 	// fork all the runner
-	broker := knock.WordList(ctx, reader)
+	broker := knock.WordGenerator(ctx, reader)
 	for i := 0; i < knock.NumWorker; i++ {
 		// run on the goroutine
 		knock.wg.Add(1)
@@ -134,7 +145,7 @@ func (knock *Knock) ParseAndRun() {
 }
 
 // list of the word-list
-func (knock *Knock) WordList(ctx context.Context, r io.Reader) (ch <-chan string) {
+func (knock *Knock) WordGenerator(ctx context.Context, r io.Reader) (ch <-chan string) {
 	tmp := make(chan string, 1)
 
 	// make sure always only one work scanner

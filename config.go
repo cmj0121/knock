@@ -23,6 +23,10 @@ func Version() (ver string) {
 var (
 	//go:embed assets/wordlists
 	wordlists string
+	//go:embed assets/usernames
+	usernames string
+	//go:embed assets/passwords
+	passwords string
 )
 
 type ResponseType int
