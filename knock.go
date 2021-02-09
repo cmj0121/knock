@@ -26,7 +26,7 @@ type Knock struct {
 
 	// number of worker, default #CPU
 	NumWorker int    `short:"w" name:"worker" help:"number of worker"`
-	WordList  string `short:"W" choices:"wordlists usernames passwords" help:"default word-lists"`
+	WordList  string `short:"W" name:"word-list" choices:"wordlists usernames passwords" help:"default word lists"`
 
 	// the global timeout based on seconds
 	Timeuot int `short:"t" help:"global timeout based on seconds"`
@@ -46,6 +46,7 @@ func New() (knock *Knock) {
 	knock = &Knock{
 		Logger:    logger.New(PROJ_NAME),
 		NumWorker: runtime.NumCPU(),
+		WordList:  "wordlists",
 		Timeuot:   60,
 
 		// NOTE - #Reducer Buffer=16
