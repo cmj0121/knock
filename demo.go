@@ -1,7 +1,7 @@
 package knock
 
 import (
-	"io"
+	"context"
 )
 
 // list all the word-list as the demo runner
@@ -33,8 +33,7 @@ func (demo *Demo) Run(receiver chan<- Response, broker <-chan string) {
 	}
 }
 
-// does not provide the customized word-list
-func (demo *Demo) Reader() (r io.Reader) {
-	r = nil
+func (demo *Demo) Broker(ctx context.Context) (ch <-chan string) {
+	ch = nil
 	return
 }

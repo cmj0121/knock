@@ -1,8 +1,8 @@
 package knock
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"net"
 	"sync"
 )
@@ -56,7 +56,7 @@ func (info *Info) showIface(receiver chan<- Response, iface net.Interface) {
 }
 
 // does not provide the customized word-list
-func (info *Info) Reader() (r io.Reader) {
-	r = nil
+func (info *Info) Broker(ctx context.Context) (ch <-chan string) {
+	ch = nil
 	return
 }

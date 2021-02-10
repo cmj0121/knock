@@ -1,8 +1,8 @@
 package knock
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"net"
 	"sync"
 	"time"
@@ -26,9 +26,7 @@ type Scan struct {
 	MaxPkgSize int32          `short:"P" name:"pkg-size" default:"65536" help:"maximal packet size"`
 
 	// IP meta
-	IPv6       bool `short:"6" help:"only scan IPv6"`
-	net.IP     `-`
-	*net.IPNet `-`
+	IPv6 bool `short:"6" help:"only scan IPv6"`
 
 	ARP bool `help:"scan via the ARP protocol"`
 
@@ -91,23 +89,29 @@ func (scan *Scan) Run(receiver chan<- Response, broker <-chan string) {
 		go scan.RecvPkg(receiver)
 	})
 
+	_, ipnet, _ := net.ParseCIDR(*scan.CIDR)
 	if addrs, err := scan.IFace.Addrs(); err == nil {
-		var srcIP net.IP
-
-		for _, addr := range addrs {
-			if inet, ok := addr.(*net.IPNet); ok {
-				if scan.IPNet.Contains(inet.IP) {
-					srcIP = inet.IP
-					break
-				}
-			}
-		}
-
 		for {
 			ip, ok := <-broker
 			if !ok {
 				// end-of-task
 				break
+			}
+
+			// show the progress
+			receiver <- Response{
+				Type:    RESP_PROGRESS,
+				Message: ip,
+			}
+
+			var srcIP net.IP
+			for _, addr := range addrs {
+				if inet, ok := addr.(*net.IPNet); ok {
+					if ipnet.Contains(inet.IP) {
+						srcIP = inet.IP
+						break
+					}
+				}
 			}
 
 			// build the ARP request
@@ -149,11 +153,6 @@ func (scan *Scan) Run(receiver chan<- Response, broker <-chan string) {
 				}
 				return
 			}
-			// show the progress
-			receiver <- Response{
-				Type:    RESP_PROGRESS,
-				Message: ip,
-			}
 		}
 	}
 
@@ -165,37 +164,30 @@ func (scan *Scan) Run(receiver chan<- Response, broker <-chan string) {
 	time.Sleep(time.Duration(scan.RTT) * time.Millisecond)
 }
 
-func (scan *Scan) Reader() (r io.Reader) {
-	// generate the IP list by CIDR
-	scan.IP, scan.IPNet, _ = net.ParseCIDR(*scan.CIDR)
-	scan.IP = scan.IP.Mask(scan.IPNet.Mask)
-	r = scan
-	return
-}
+func (scan *Scan) Broker(ctx context.Context) (ch <-chan string) {
+	broker := make(chan string, 1)
 
-func (scan *Scan) Read(p []byte) (n int, err error) {
-	switch scan.IPv6 {
-	case true:
-		// not support IPv6
-		err = io.EOF
-	case false:
-		if !scan.IPNet.Contains(scan.IP) {
-			err = io.EOF
-			return
-		}
+	go func() {
+		defer close(broker)
 
-		ip := scan.IP.To4().String() + "\n"
-		copy(p, []byte(ip))
-		n = len(ip)
+		ip, ipnet, _ := net.ParseCIDR(*scan.CIDR)
+		// reset the IP in the mask
+		ip = ip.Mask(ipnet.Mask)
 
-		// increase IP
-		for idx := len(scan.IP) - 1; idx >= 0; idx-- {
-			scan.IP[idx]++
-			if scan.IP[idx] > 0 {
-				break
+		// enumerate all IP in the subnet
+		for ipnet.Contains(ip) {
+			broker <- ip.String()
+			// increase IP
+			for idx := len(ip) - 1; idx >= 0; idx-- {
+				ip[idx]++
+				if ip[idx] > 0 {
+					break
+				}
 			}
 		}
-	}
+	}()
+
+	ch = broker
 	return
 }
 

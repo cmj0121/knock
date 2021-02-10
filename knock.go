@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"runtime"
 	"strings"
@@ -105,32 +104,18 @@ func (knock *Knock) ParseAndRun() {
 	defer cancel()
 
 	knock.Logger.Debug("use runner: %T", runner)
-	reader := runner.Reader()
-	if reader == nil {
-		knock.Logger.Info("load the default word-lists: %v", knock.WordList)
-		switch knock.WordList {
-		case "wordlists":
-			reader = strings.NewReader(wordlists)
-		case "usernames":
-			reader = strings.NewReader(usernames)
-		case "passwords":
-			reader = strings.NewReader(passwords)
-		default:
-			knock.Logger.Crit("not supported default word-lists: %#v", knock.WordList)
-			return
-		}
-	}
 
 	/* ---- runner ---- */
 	// fork all the runner
-	broker := knock.WordGenerator(ctx, reader)
+	broker := knock.Broker(ctx, runner.Broker(ctx))
 	for i := 0; i < knock.NumWorker; i++ {
 		// run on the goroutine
 		knock.wg.Add(1)
-		go func() {
+		go func(idx int) {
 			defer knock.wg.Done()
 			runner.Run(knock.receiver, broker)
-		}()
+			knock.Logger.Info("stop runner: #%d/%d", idx+1, knock.NumWorker)
+		}(i)
 	}
 
 	// close the receiver if all runner closed
@@ -145,29 +130,57 @@ func (knock *Knock) ParseAndRun() {
 	return
 }
 
-// list of the word-list
-func (knock *Knock) WordGenerator(ctx context.Context, r io.Reader) (ch <-chan string) {
+// load the broker, wrapper the customized broker if exist, and set delay on each message
+func (knock *Knock) Broker(ctx context.Context, broker <-chan string) (ch <-chan string) {
 	tmp := make(chan string, 1)
 
 	// make sure always only one work scanner
 	go func() {
 		defer close(tmp)
-		scanner := bufio.NewScanner(r)
 
-		// load the str
-		for scanner.Scan() {
-			select {
-			case <-ctx.Done():
-				return
+		switch broker {
+		case nil:
+			var scanner *bufio.Scanner
+
+			switch knock.WordList {
+			case "wordlists":
+				reader := strings.NewReader(wordlists)
+				scanner = bufio.NewScanner(reader)
+			case "usernames":
+				reader := strings.NewReader(usernames)
+				scanner = bufio.NewScanner(reader)
+			case "passwords":
+				reader := strings.NewReader(passwords)
+				scanner = bufio.NewScanner(reader)
 			default:
-				text := scanner.Text()
-				tmp <- text
+				knock.Logger.Crit("not supported default word-lists: %#v", knock.WordList)
+				return
+			}
+
+			// load the str
+			for scanner.Scan() {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					text := scanner.Text()
+					tmp <- text
+					// wait ?ms per each word list generated
+					time.Sleep(time.Duration(knock.Wait) * time.Millisecond)
+				}
+			}
+		default:
+			for {
+				msg, ok := <-broker
+				if !ok {
+					// end-of-message from customized broker
+					return
+				}
+				tmp <- msg
 				// wait ?ms per each word list generated
 				time.Sleep(time.Duration(knock.Wait) * time.Millisecond)
 			}
 		}
-
-		return
 	}()
 
 	ch = tmp
@@ -190,6 +203,20 @@ func (knock *Knock) Reducer() {
 		} else {
 			// show the message to the console
 			switch resp.Type {
+			case RESP_ERR:
+				switch {
+				case isTerm:
+					os.Stdout.WriteString(fmt.Sprintf("\x1b[2K\x1b[1000D[!] %v\n", resp.Message))
+				case isStderrTerm:
+					os.Stderr.WriteString(fmt.Sprintf("\x1b[2K\x1b[1000D[!] %v\n", resp.Message))
+				}
+			case RESP_DEBUG:
+				switch {
+				case isTerm:
+					os.Stdout.WriteString(fmt.Sprintf("\x1b[2K\x1b[1000D[?] %v\n", resp.Message))
+				case isStderrTerm:
+					os.Stderr.WriteString(fmt.Sprintf("\x1b[2K\x1b[1000D[?] %v\n", resp.Message))
+				}
 			case RESP_PROGRESS:
 				switch {
 				case isTerm:

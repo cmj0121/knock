@@ -1,8 +1,8 @@
 package knock
 
 import (
+	"context"
 	"fmt"
-	"io"
 
 	_ "embed"
 )
@@ -33,6 +33,7 @@ type ResponseType int
 
 const (
 	RESP_ERR = iota
+	RESP_DEBUG
 	RESP_PROGRESS
 	RESP_RESULT
 )
@@ -55,6 +56,6 @@ type Runner interface {
 	// the runner task by one receiver and one broker
 	Run(receiver chan<- Response, broker <-chan string)
 
-	// the customized word-list
-	Reader() io.Reader
+	// the customized broker
+	Broker(ctx context.Context) (broker <-chan string)
 }
