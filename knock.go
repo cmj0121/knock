@@ -34,6 +34,7 @@ type Knock struct {
 	*Demo `help:"list all the word-list"`
 	*Info `help:"show the current system info"`
 	*Scan `help:"scan via network protocol"`
+	*Git  `help:"fetch the remote Git public repo"`
 
 	/* ---- private fields */
 	receiver chan Response
@@ -89,6 +90,8 @@ func (knock *Knock) ParseAndRun() {
 		runner = knock.Info
 	case knock.Scan != nil:
 		runner = knock.Scan
+	case knock.Git != nil:
+		runner = knock.Git
 	default:
 		knock.Logger.Crit("not specified runner")
 		return
@@ -176,6 +179,8 @@ func (knock *Knock) Broker(ctx context.Context, broker <-chan string) (ch <-chan
 					// end-of-message from customized broker
 					return
 				}
+
+				// re-direct the message to the exposed broker
 				tmp <- msg
 				// wait ?ms per each word list generated
 				time.Sleep(time.Duration(knock.Wait) * time.Millisecond)
