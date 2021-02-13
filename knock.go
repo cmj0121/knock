@@ -34,7 +34,7 @@ type Knock struct {
 	*Demo `help:"list all the word-list"`
 	*Info `help:"show the current system info"`
 	*Scan `help:"scan via network protocol"`
-	*Git  `help:"fetch the remote Git public repo"`
+	*Web  `help:"web-related scanner"`
 
 	/* ---- private fields */
 	receiver chan Response
@@ -90,8 +90,8 @@ func (knock *Knock) ParseAndRun() {
 		runner = knock.Info
 	case knock.Scan != nil:
 		runner = knock.Scan
-	case knock.Git != nil:
-		runner = knock.Git
+	case knock.Web != nil:
+		runner = knock.Web
 	default:
 		knock.Logger.Crit("not specified runner")
 		return
