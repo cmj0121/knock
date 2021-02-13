@@ -11,7 +11,7 @@ const (
 	PROJ_NAME = "knock"
 
 	MAJOR = 1
-	MINOR = 0
+	MINOR = 1
 	MACRO = 0
 )
 
