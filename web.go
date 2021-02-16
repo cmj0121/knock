@@ -123,23 +123,26 @@ func (web *Web) Run(receiver chan<- Response, broker <-chan string) {
 			defer resp.Body.Close()
 
 			switch {
-			case resp.StatusCode >= 200 && resp.StatusCode < 300 && string(data) != web.html_success:
-				receiver <- Response{
-					Type:    RESP_RESULT,
-					Message: fmt.Sprintf("[%d] %s: %#v %#v", resp.StatusCode, url, string(data), web.html_success),
+			case resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices:
+				if string(data) != web.html_success {
+					receiver <- Response{
+						Type:    RESP_RESULT,
+						Message: fmt.Sprintf("[%d] %s: %#v %#v", resp.StatusCode, url, string(data), web.html_success),
+					}
 				}
-			case resp.StatusCode >= 300 && resp.StatusCode < 400:
-				receiver <- Response{
-					Type:    RESP_RESULT,
-					Message: fmt.Sprintf("[%d] %s", resp.StatusCode, url),
-				}
-			case resp.StatusCode >= 400 && resp.StatusCode < 500 && string(data) != web.html_failure:
-			case resp.StatusCode >= 500 && resp.StatusCode < 600:
+			case resp.StatusCode >= http.StatusMultipleChoices && resp.StatusCode < http.StatusBadRequest:
 				receiver <- Response{
 					Type:    RESP_RESULT,
 					Message: fmt.Sprintf("[%d] %s", resp.StatusCode, url),
 				}
-			case resp.StatusCode > 600:
+			case resp.StatusCode >= http.StatusBadRequest && resp.StatusCode < http.StatusInternalServerError:
+				if string(data) != web.html_failure {
+					receiver <- Response{
+						Type:    RESP_RESULT,
+						Message: fmt.Sprintf("[%d] %s: %#v %#v", resp.StatusCode, url, string(data), web.html_success),
+					}
+				}
+			default:
 				receiver <- Response{
 					Type:    RESP_RESULT,
 					Message: fmt.Sprintf("[%d] %s", resp.StatusCode, url),
@@ -175,7 +178,11 @@ func (web *Web) runGit(hash string, receiver chan<- Response, broker <-chan stri
 			Message: fmt.Sprintf("fetch %v: %v", hash, err),
 		}
 		return
-	} else if resp.StatusCode != 200 {
+	}
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+	default:
 		receiver <- Response{
 			Type:    RESP_ERR,
 			Message: fmt.Sprintf("fetch %v: %v", hash, resp.Status),
