@@ -35,6 +35,7 @@ type Knock struct {
 	*Info `help:"show the current system info"`
 	*Scan `help:"scan via network protocol"`
 	*Web  `help:"web-related scanner"`
+	*DNS  `help:"scan DNS record"`
 
 	/* ---- private fields */
 	receiver chan Response
@@ -92,6 +93,8 @@ func (knock *Knock) ParseAndRun() {
 		runner = knock.Scan
 	case knock.Web != nil:
 		runner = knock.Web
+	case knock.DNS != nil:
+		runner = knock.DNS
 	default:
 		knock.Logger.Crit("not specified runner")
 		return
