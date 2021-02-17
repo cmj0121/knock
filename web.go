@@ -43,6 +43,8 @@ type Web struct {
 	Scheme string  `short:"s" default:"http" choices:"http https" help:"the URI scheme"`
 	URI    *string `help:"the target URI"`
 
+	Skip404 bool `name:"404" default:"true" help:"skip 404 page"`
+
 	*http.Client `-`
 	broker       chan string
 	commits      sync.Map
@@ -127,7 +129,7 @@ func (web *Web) Run(receiver chan<- Response, broker <-chan string) {
 				if string(data) != web.html_success {
 					receiver <- Response{
 						Type:    RESP_RESULT,
-						Message: fmt.Sprintf("[%d] %s: %#v %#v", resp.StatusCode, url, string(data), web.html_success),
+						Message: fmt.Sprintf("[%d] %s", resp.StatusCode, url),
 					}
 				}
 			case resp.StatusCode >= http.StatusMultipleChoices && resp.StatusCode < http.StatusBadRequest:
@@ -136,10 +138,10 @@ func (web *Web) Run(receiver chan<- Response, broker <-chan string) {
 					Message: fmt.Sprintf("[%d] %s", resp.StatusCode, url),
 				}
 			case resp.StatusCode >= http.StatusBadRequest && resp.StatusCode < http.StatusInternalServerError:
-				if string(data) != web.html_failure {
+				if string(data) != web.html_failure && !web.Skip404 {
 					receiver <- Response{
 						Type:    RESP_RESULT,
-						Message: fmt.Sprintf("[%d] %s: %#v %#v", resp.StatusCode, url, string(data), web.html_success),
+						Message: fmt.Sprintf("[%d] %s", resp.StatusCode, url),
 					}
 				}
 			default:
