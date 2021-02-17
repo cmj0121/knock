@@ -15,6 +15,11 @@ import (
 type DNS struct {
 	argparse.Help
 
+	A     bool `default:"true" help:"scan the A record"`
+	MX    bool `default:"true" help:"scan the MX record"`
+	TXT   bool `default:"true" help:"scan the TXT record"`
+	CNAME bool `default:"true" help:"scan the CNAME record"`
+
 	Hostname *string `help:"the target hostname"`
 
 	IPs []string `-`
@@ -50,49 +55,60 @@ func (dns *DNS) Run(receiver chan<- Response, broker <-chan string) {
 				Message: hostname,
 			}
 
-			// find A/AAAA
-			if addrs, err := net.LookupHost(hostname); err == nil {
-				sort.Strings(addrs)
-
-				if reflect.DeepEqual(addrs, dns.IPs) {
-					// wildcard subdomain
-					continue
-				}
-				receiver <- Response{
-					Type:    RESP_RESULT,
-					Message: fmt.Sprintf("[A/AAAA] %-22s -> %v", hostname, addrs),
-				}
-			}
-
-			// find CNAME
-			if cname, err := net.LookupCNAME(hostname); err == nil {
-				switch {
-				case cname == hostname:
-				case cname == hostname+".":
-				default:
-					receiver <- Response{
-						Type:    RESP_RESULT,
-						Message: fmt.Sprintf("[CNAME]  %-22s -> %s", hostname, cname),
+			// find TXT
+			if dns.TXT {
+				if txts, err := net.LookupTXT(hostname); err == nil {
+					if txt := strings.Join(txts, " "); txt != "v=spf1 -all" {
+						receiver <- Response{
+							Type:    RESP_RESULT,
+							Message: fmt.Sprintf("[TXT]    %-22s -> %v", hostname, txt),
+						}
 					}
 				}
 			}
 
-			// find TXT
-			if txts, err := net.LookupTXT(hostname); err == nil {
-				if txt := strings.Join(txts, " "); txt != "v=spf1 -all" {
+			// find CNAME
+			if dns.CNAME {
+				if cname, err := net.LookupCNAME(hostname); err == nil {
+					switch {
+					case cname == hostname:
+					case cname == hostname+".":
+					default:
+						receiver <- Response{
+							Type:    RESP_RESULT,
+							Message: fmt.Sprintf("[CNAME]  %-22s -> %s", hostname, cname),
+						}
+
+						// CNAME will no need to find the A/AAAA record
+						continue
+					}
+				}
+			}
+
+			// find A/AAAA
+			if dns.A {
+				if addrs, err := net.LookupHost(hostname); err == nil {
+					sort.Strings(addrs)
+
+					if reflect.DeepEqual(addrs, dns.IPs) {
+						// wildcard subdomain
+						continue
+					}
 					receiver <- Response{
 						Type:    RESP_RESULT,
-						Message: fmt.Sprintf("[TXT]    %-22s -> %v", hostname, txt),
+						Message: fmt.Sprintf("[A/AAAA] %-22s -> %v", hostname, addrs),
 					}
 				}
 			}
 
 			// find MX
-			if mxs, err := net.LookupMX(hostname); err == nil {
-				for idx := range mxs {
-					receiver <- Response{
-						Type:    RESP_RESULT,
-						Message: fmt.Sprintf("[MX]     %-22s -> %v", hostname, mxs[idx].Host),
+			if dns.MX {
+				if mxs, err := net.LookupMX(hostname); err == nil {
+					for idx := range mxs {
+						receiver <- Response{
+							Type:    RESP_RESULT,
+							Message: fmt.Sprintf("[MX]     %-22s -> %v", hostname, mxs[idx].Host),
+						}
 					}
 				}
 			}
