@@ -1,9 +1,11 @@
 package knock
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -21,6 +23,8 @@ type DNS struct {
 	CNAME bool `default:"true" help:"scan the CNAME record"`
 
 	Hostname *string `help:"the target hostname"`
+
+	*os.File `args:"option" short:"F" help:"specified the customized word-list"`
 
 	IPs []string `-`
 }
@@ -117,6 +121,27 @@ func (dns *DNS) Run(receiver chan<- Response, broker <-chan string) {
 }
 
 func (dns *DNS) Broker(ctx context.Context) (broker <-chan string) {
-	broker = nil
+	switch dns.File {
+	case nil:
+		broker = nil
+	default:
+		tmp := make(chan string, 1)
+		go func() {
+			defer close(tmp)
+
+			dns.File.Seek(0, os.SEEK_SET)
+			scanner := bufio.NewScanner(dns.File)
+			for scanner.Scan() {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					text := scanner.Text()
+					tmp <- text
+				}
+			}
+		}()
+		broker = tmp
+	}
 	return
 }
