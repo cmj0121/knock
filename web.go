@@ -112,6 +112,10 @@ func (web *Web) Run(receiver chan<- Response, broker <-chan string) {
 			web.runGit(hash, receiver, broker)
 		default:
 			url := fmt.Sprintf("%s://%s/%s", web.Scheme, *web.URI, hash)
+			receiver <- Response{
+				Type:    RESP_PROGRESS,
+				Message: url,
+			}
 			resp, err := web.Get(url)
 			if err != nil {
 				receiver <- Response{
@@ -167,8 +171,7 @@ func (web *Web) runGit(hash string, receiver chan<- Response, broker <-chan stri
 
 	web.commits.Store(hash, true)
 	receiver <- Response{
-		Type: RESP_DEBUG,
-		//Type:    RESP_PROGRESS,
+		Type:    RESP_PROGRESS,
 		Message: hash,
 	}
 
