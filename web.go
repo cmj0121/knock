@@ -1,9 +1,11 @@
 package knock
 
 import (
+	"bufio"
 	"bytes"
 	"compress/zlib"
 	"context"
+	"crypto/tls"
 	"encoding/binary"
 	"fmt"
 	"io/ioutil"
@@ -43,6 +45,8 @@ type Web struct {
 	Scheme string  `short:"s" default:"http" choices:"http https" help:"the URI scheme"`
 	URI    *string `help:"the target URI"`
 
+	*os.File `args:"option" short:"F" help:"specified the customized word-list"`
+
 	Skip404 bool `name:"404" default:"true" help:"skip 404 page"`
 
 	*http.Client `-`
@@ -55,9 +59,14 @@ type Web struct {
 }
 
 func (web *Web) Open() (err error) {
-	err = nil
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
 	web.Client = &http.Client{
-		Timeout: time.Duration(web.Timeout) * time.Second,
+		Transport: tr,
+		Timeout:   time.Duration(web.Timeout) * time.Second,
 	}
 
 	switch {
@@ -142,11 +151,14 @@ func (web *Web) Run(receiver chan<- Response, broker <-chan string) {
 					Message: fmt.Sprintf("[%d] %s", resp.StatusCode, url),
 				}
 			case resp.StatusCode >= http.StatusBadRequest && resp.StatusCode < http.StatusInternalServerError:
-				if string(data) != web.html_failure && !web.Skip404 {
-					receiver <- Response{
-						Type:    RESP_RESULT,
-						Message: fmt.Sprintf("[%d] %s", resp.StatusCode, url),
+				if resp.StatusCode == http.StatusNotFound {
+					if string(data) != web.html_failure && web.Skip404 {
+						continue
 					}
+				}
+				receiver <- Response{
+					Type:    RESP_RESULT,
+					Message: fmt.Sprintf("[%d] %s", resp.StatusCode, url),
 				}
 			default:
 				receiver <- Response{
@@ -355,6 +367,24 @@ func (web *Web) Broker(ctx context.Context) (broker <-chan string) {
 		}()
 
 		broker = web.broker
+	case web.File != nil:
+		tmp := make(chan string, 1)
+		go func() {
+			defer close(tmp)
+
+			web.File.Seek(0, os.SEEK_SET)
+			scanner := bufio.NewScanner(web.File)
+			for scanner.Scan() {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					text := scanner.Text()
+					tmp <- text
+				}
+			}
+		}()
+		broker = tmp
 	}
 	return
 }
