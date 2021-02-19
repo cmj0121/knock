@@ -96,3 +96,8 @@ contact
 service
 .well-known
 log
+theme
+data
+upload
+uploads
+metrics

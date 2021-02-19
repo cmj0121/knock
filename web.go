@@ -42,8 +42,9 @@ type Web struct {
 	Git          bool   `help:"fetch the git repo"`
 	GitLocalRepo string `name:"local" default:"git" help:"the local repository location"`
 
-	Scheme string  `short:"s" default:"http" choices:"http https" help:"the URI scheme"`
+	SSL    bool    `short:"s" help:"enable HTTPS"`
 	URI    *string `help:"the target URI"`
+	scheme string
 
 	*os.File `args:"option" short:"F" help:"specified the customized word-list"`
 
@@ -69,6 +70,11 @@ func (web *Web) Open() (err error) {
 		Timeout:   time.Duration(web.Timeout) * time.Second,
 	}
 
+	web.scheme = "http"
+	if web.SSL {
+		web.scheme = "https"
+	}
+
 	switch {
 	case web.URI == nil || *web.URI == "":
 		err = fmt.Errorf("should pass URI")
@@ -76,7 +82,7 @@ func (web *Web) Open() (err error) {
 	case web.Git:
 	default:
 		// html success
-		url := fmt.Sprintf("%s://%s", web.Scheme, *web.URI)
+		url := fmt.Sprintf("%s://%s", web.scheme, *web.URI)
 		if resp, err := web.Get(url); err == nil {
 			defer resp.Body.Close()
 
@@ -87,7 +93,7 @@ func (web *Web) Open() (err error) {
 		}
 
 		// html failure
-		url = fmt.Sprintf("%s://%s/%s", web.Scheme, *web.URI, WEB_NOT_EXIST_PAGE)
+		url = fmt.Sprintf("%s://%s/%s", web.scheme, *web.URI, WEB_NOT_EXIST_PAGE)
 		if resp, err := web.Get(url); err == nil {
 			defer resp.Body.Close()
 
@@ -114,13 +120,12 @@ func (web *Web) Run(receiver chan<- Response, broker <-chan string) {
 			// no other hash need process
 			break
 		}
-
 		switch {
 		case web.Git:
 			// run the Git repo
 			web.runGit(hash, receiver, broker)
 		default:
-			url := fmt.Sprintf("%s://%s/%s", web.Scheme, *web.URI, hash)
+			url := fmt.Sprintf("%s://%s/%s", web.scheme, *web.URI, hash)
 			receiver <- Response{
 				Type:    RESP_PROGRESS,
 				Message: url,
@@ -188,7 +193,7 @@ func (web *Web) runGit(hash string, receiver chan<- Response, broker <-chan stri
 	}
 
 	// fetch the git file
-	resp, err := web.Get(fmt.Sprintf("%s://%s/%s", web.Scheme, *web.URI, hash))
+	resp, err := web.Get(fmt.Sprintf("%s://%s/%s", web.scheme, *web.URI, hash))
 	if err != nil {
 		receiver <- Response{
 			Type:    RESP_ERR,
