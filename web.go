@@ -380,7 +380,11 @@ func (web *Web) Broker(ctx context.Context) (broker <-chan string) {
 					return
 				default:
 					text := scanner.Text()
-					tmp <- text
+					switch {
+					case len(text) > 0 && text[0] == '#':
+					default:
+						tmp <- text
+					}
 				}
 			}
 		}()
