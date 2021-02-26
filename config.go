@@ -12,7 +12,7 @@ const (
 
 	MAJOR = 1
 	MINOR = 2
-	MACRO = 2
+	MACRO = 3
 )
 
 func Version() (ver string) {

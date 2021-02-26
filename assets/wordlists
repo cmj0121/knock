@@ -21,7 +21,10 @@ note
 index.php
 
 modules
+git
 .git
+api
+apis
 api/graphiql
 text
 monitoring
@@ -101,3 +104,14 @@ data
 upload
 uploads
 metrics
+exec
+cgi-bin
+pods
+run
+configz
+debug
+js
+php
+db
+login
+bug
