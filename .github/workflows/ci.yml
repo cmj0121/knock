@@ -24,5 +24,7 @@ jobs:
         with:
           go-version: '1.16.0'
       - run: go version
+      # for the <pcap.h>
+      - run: sudo apt-get install libpcap-dev
       - run: |
           make
