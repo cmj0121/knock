@@ -1,4 +1,6 @@
 # knock #
+![Go test](https://github.com/cmj0121/knock/workflows/test/badge.svg) 
+
 The **knock** is the Go-based brute-force tool.
 
 
