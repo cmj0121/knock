@@ -17,6 +17,7 @@ help:		# show this message
 
 linter: $(SRC)
 	gofmt -w -s $^
+	go get
 	go test -cover -failfast -timeout 2s ./...
 	go test -bench=. -cover -failfast -benchmem
 
