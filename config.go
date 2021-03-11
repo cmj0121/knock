@@ -11,8 +11,8 @@ const (
 	PROJ_NAME = "knock"
 
 	MAJOR = 1
-	MINOR = 2
-	MACRO = 3
+	MINOR = 3
+	MACRO = 0
 )
 
 func Version() (ver string) {

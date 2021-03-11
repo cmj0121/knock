@@ -17,7 +17,8 @@ import (
 
 // the knock interface which provide the global setting
 type Knock struct {
-	argparse.Model
+	argparse.Help
+	Version bool `short:"v" help:"show version info" callback:"Ver"`
 
 	// the internal logger
 	*logger.Logger `-`
@@ -57,7 +58,7 @@ func New() (knock *Knock) {
 }
 
 // show the knock version info
-func (knock *Knock) Version(parser *argparse.ArgParse) (exit bool) {
+func (knock *Knock) Ver(parser *argparse.ArgParse) (exit bool) {
 	os.Stdout.WriteString(Version() + "\n")
 	exit = true
 	return
@@ -66,7 +67,6 @@ func (knock *Knock) Version(parser *argparse.ArgParse) (exit bool) {
 // parse from the command-line and execute the knock
 func (knock *Knock) ParseAndRun() {
 	parser := argparse.MustNew(knock)
-	argparse.RegisterCallback(argparse.FN_VERSION, knock.Version)
 	defer func() {
 		if r := recover(); r != nil {
 			parser.HelpMessage(fmt.Errorf("%v", r))
