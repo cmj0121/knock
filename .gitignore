@@ -4,5 +4,3 @@ cmd/*
 !cmd/*.go
 
 go.sum
-
-.benchmark

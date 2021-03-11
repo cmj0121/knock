@@ -4,7 +4,7 @@ SRC := $(shell find . -name '*.go')
 BIN := $(subst .go,,$(wildcard cmd/*.go))
 
 
-all: $(BIN) linter	# build all binary
+all: $(BIN)	# build all binary
 
 clean:		# clean-up the environment
 	rm -f $(BIN)
@@ -15,30 +15,16 @@ help:		# show this message
 	@perl -nle 'print $$& if m{^[\w-]+:.*?#.*$$}' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?#"} {printf "    %-18s %s\n", $$1, $$2}'
 
-PREFIX := /usr/local/bin
-install: $(BIN)	# install the binary to the PREFIX
-	install -m755 $^ $(PREFIX)/
-
-ifeq ($(shell go version|grep -oE 1.16),1.16)
-GO := go
-else ifneq ($(shell ls ~/go/bin/ | grep 1.16 | head -n1),"")
-GO := ~/go/bin/$(shell ls ~/go/bin | grep 1.16 | head -n1)
-endif
-## FIXME - should be used the $(GO)
-GOFMT   := gofmt -w -s
-GOFLAG  := -ldflags="-s -w"
-GOTEST  := $(GO) test -cover -failfast -timeout 2s
-GOBENCH := $(GO) test -bench=. -cover -failfast -benchmem
-
-linter: .benchmark
-	$(GOFMT) $(shell find . -name '*.go')
-	$(GOTEST) ./...
-
-.benchmark: $(SRC)
-	touch $@
-	$(GOBENCH)
+linter: $(SRC)
+	gofmt -w -s $^
+	go test -cover -failfast -timeout 2s ./...
+	go test -bench=. -cover -failfast -benchmem
 
 $(BIN): linter
 
 %: %.go
-	$(GO) build $(GOFLAG) -o $@ $<
+	go build  -ldflags="-s -w" -o $@ $<
+
+PREFIX := /usr/local/bin
+install: $(BIN)	# install the binary to the PREFIX
+	install -m755 $^ $(PREFIX)/
