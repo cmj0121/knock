@@ -134,7 +134,7 @@ func (web *Web) Run(receiver chan<- Response, broker <-chan string) {
 			if err != nil {
 				receiver <- Response{
 					Type:    RESP_ERR,
-					Message: fmt.Sprintf("fetch %v: %v", hash, err),
+					Message: fmt.Sprintf("fetch %#v: %v", url, err),
 				}
 				return
 			}
