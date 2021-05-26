@@ -30,6 +30,21 @@ var (
 	RE_GIT_OBJECT_HASH = regexp.MustCompile(`([a-fA-F0-9]{2})([a-fA-F0-9]{38})`)
 	RE_GIT_OBJECT_TREE = regexp.MustCompile(`(?:parent|tree) ([a-fA-F0-9]{2})([a-fA-F0-9]{38})`)
 	RE_GIT_OBJECT_BLOB = regexp.MustCompile(`\d{5,6} .*?` + "\x00")
+
+	// the X- series header that may used to skip the firewall check
+	X_SERIES_HEADER = []string{
+		"X-Originating-IP",
+		"X-Forwarded-For",
+		"X-Remote-IP",
+		"X-Remote-Addr",
+		"X-Forwarded-Host",
+		"X-Client-IP",
+		"X-Host",
+		"Forwarded",
+		"X-Forwarded-By",
+		"X-Forwarded-For-IP",
+		"X-True-IP",
+	}
 )
 
 // fetch the git to local repo
@@ -45,6 +60,10 @@ type Web struct {
 	SSL    bool    `short:"s" help:"enable HTTPS"`
 	URI    *string `help:"the target URI"`
 	scheme string
+
+	// provide the mock IP via the X- header
+	MockIP  string `name:"mock-ip" help:"provide the mock IP vai all X- series header"`
+	Referer string `short:"R" help:"provide extra Referer header"`
 
 	*os.File `args:"option" short:"F" help:"specified the customized word-list"`
 
@@ -404,6 +423,18 @@ func (web *Web) Get(url string) (resp *http.Response, err error) {
 	if req, err = http.NewRequest("GET", url, nil); err == nil {
 		// customized header
 		req.Header.Set("User-Agent", Version())
+
+		// set the extra header
+		if web.MockIP != "" {
+			// add the X- series header for by-pass the firewall
+			for _, header := range X_SERIES_HEADER {
+				req.Header.Set(header, web.MockIP)
+			}
+		}
+		if web.Referer != "" {
+			req.Header.Set("Referer", web.Referer)
+		}
+
 		resp, err = web.Client.Do(req)
 	}
 
