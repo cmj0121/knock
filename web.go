@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	WEB_GROKER_CHANNEL_LEN = 64
+	WEB_BROKER_CHANNEL_LEN = 64
 	WEB_NOT_EXIST_PAGE     = "KNOCK_NOT_EXIST_PAGE"
 	// git reference
 	RE_GIT_REF = regexp.MustCompile(`ref: ([a-zA-Z0-9/]+)`)
@@ -60,6 +60,8 @@ type Web struct {
 	SSL    bool    `short:"s" help:"enable HTTPS"`
 	URI    *string `help:"the target URI"`
 	scheme string
+
+	Method *string `args:"option" short:"M" help:"specified the HTTP method to access"`
 
 	// provide the mock IP via the X- header
 	MockIP  string `name:"mock-ip" help:"provide the mock IP vai all X- series header"`
@@ -102,7 +104,7 @@ func (web *Web) Open() (err error) {
 	default:
 		// html success
 		url := fmt.Sprintf("%s://%s", web.scheme, *web.URI)
-		if resp, err := web.Get(url); err == nil {
+		if resp, err := web.Do("GET", url); err == nil {
 			defer resp.Body.Close()
 
 			if data, err := ioutil.ReadAll(resp.Body); err == nil {
@@ -113,7 +115,7 @@ func (web *Web) Open() (err error) {
 
 		// html failure
 		url = fmt.Sprintf("%s://%s/%s", web.scheme, *web.URI, WEB_NOT_EXIST_PAGE)
-		if resp, err := web.Get(url); err == nil {
+		if resp, err := web.Do("GET", url); err == nil {
 			defer resp.Body.Close()
 
 			if data, err := ioutil.ReadAll(resp.Body); err == nil {
@@ -140,6 +142,29 @@ func (web *Web) Run(receiver chan<- Response, broker <-chan string) {
 			break
 		}
 		switch {
+		case *web.Method != "":
+			url := fmt.Sprintf("%s://%s", web.scheme, *web.URI)
+			receiver <- Response{
+				Type:    RESP_PROGRESS,
+				Message: fmt.Sprintf("[%s] %s", *web.Method, url),
+			}
+
+			resp, err := web.Do(*web.Method, url)
+			if err != nil {
+				receiver <- Response{
+					Type:    RESP_ERR,
+					Message: fmt.Sprintf("fetch %#v: %v", url, err),
+				}
+				return
+			}
+
+			data, err := ioutil.ReadAll(resp.Body)
+			defer resp.Body.Close()
+
+			receiver <- Response{
+				Type:    RESP_RESULT,
+				Message: fmt.Sprintf("[%d] %s\n%s", resp.StatusCode, url, data),
+			}
 		case web.Git:
 			// run the Git repo
 			web.runGit(hash, receiver, broker)
@@ -149,7 +174,7 @@ func (web *Web) Run(receiver chan<- Response, broker <-chan string) {
 				Type:    RESP_PROGRESS,
 				Message: url,
 			}
-			resp, err := web.Get(url)
+			resp, err := web.Do("GET", url)
 			if err != nil {
 				receiver <- Response{
 					Type:    RESP_ERR,
@@ -212,7 +237,7 @@ func (web *Web) runGit(hash string, receiver chan<- Response, broker <-chan stri
 	}
 
 	// fetch the git file
-	resp, err := web.Get(fmt.Sprintf("%s://%s/%s", web.scheme, *web.URI, hash))
+	resp, err := web.Do("GET", fmt.Sprintf("%s://%s/%s", web.scheme, *web.URI, hash))
 	if err != nil {
 		receiver <- Response{
 			Type:    RESP_ERR,
@@ -363,8 +388,18 @@ func (web *Web) processGitObject(receiver chan<- Response, blob []byte) (new_has
 
 func (web *Web) Broker(ctx context.Context) (broker <-chan string) {
 	switch {
+	case *web.Method != "":
+		web.broker = make(chan string, WEB_BROKER_CHANNEL_LEN)
+
+		go func() {
+			defer close(web.broker)
+			// send the dummy message
+			web.broker <- ""
+		}()
+
+		broker = web.broker
 	case web.Git:
-		web.broker = make(chan string, WEB_GROKER_CHANNEL_LEN)
+		web.broker = make(chan string, WEB_BROKER_CHANNEL_LEN)
 
 		go func() {
 			defer close(web.broker)
@@ -417,10 +452,10 @@ func (web *Web) Broker(ctx context.Context) (broker <-chan string) {
 	return
 }
 
-func (web *Web) Get(url string) (resp *http.Response, err error) {
+func (web *Web) Do(method, url string) (resp *http.Response, err error) {
 	var req *http.Request
 
-	if req, err = http.NewRequest("GET", url, nil); err == nil {
+	if req, err = http.NewRequest(method, url, nil); err == nil {
 		// customized header
 		req.Header.Set("User-Agent", Version())
 
