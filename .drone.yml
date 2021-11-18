@@ -1,0 +1,19 @@
+---
+kind: pipeline
+type: kubernetes
+name: compliance
+
+steps:
+  - name: golang:1.16
+    image: golang:1.16
+    commands:
+      - go get
+      - gofmt -d -s .
+      - go test -cover -failfast -timeout 2s ./...
+
+  - name: golang:1.17
+    image: golang:1.17
+    commands:
+      - go get
+      - gofmt -d -s .
+      - go test -cover -failfast -timeout 2s ./...
