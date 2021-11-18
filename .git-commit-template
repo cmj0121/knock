@@ -1,0 +1,13 @@
+#<type>(scope): <subject>
+
+	What happen
+
+[TICKET]
+
+# <type> must be one of the following:
+#
+#    feat       new feature
+#    docs       documentation only changes
+#    perf       performance tunning or improves
+#    build      change the build system or CI/CD flow
+#    refactor   code change not affect performance and functionality
