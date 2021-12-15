@@ -15,7 +15,7 @@ test: 			# run test
 	go test -cover -failfast -timeout 2s ./...
 
 run:			# run in the local environment
-
+	go run cmd/knock.go
 
 build: $(BIN)	# build the binary
 
@@ -28,5 +28,5 @@ help:			# show this message
 	@perl -nle 'print $$& if m{^[\w-]+:.*?#.*$$}' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?#"} {printf "    %-18s %s\n", $$1, $$2}'
 
-%: %.go
+%: %.go $(SRC)
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -ldflags="-s -w" -o $@ $<
