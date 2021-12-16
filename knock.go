@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 	"os"
+	"sync"
 	"context"
     "os/signal"
     "syscall"
@@ -18,22 +19,37 @@ type Knock struct {
 
 	// the shared channel to notify workers closed
 	closed chan struct{}
+	// the shared channel to notify main thread about all workers closed
+	finished chan struct{}
 }
 
 func New() (knock *Knock) {
 	knock = &Knock{
 		Worker: runtime.NumCPU(),
 		closed: make(chan struct{}, 1),
+		finished: make(chan struct{}, 1),
 	}
 	return
 }
 
 // run the knock with provides arguments
 func (knock *Knock) Run() {
+	wg := sync.WaitGroup{}
+
 	// start all the worker
 	for idx := 0; idx < knock.Worker; idx++ {
-		go knock.DummyTask(knock.closed)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			knock.DummyTask(knock.closed)
+		}()
 	}
+
+	// wait all task finished, and notify main thread
+	go func() {
+		wg.Wait()
+		close(knock.finished)
+	}()
 
 	// exactly run the knock, wait finished or catch Ctrl-C
 	knock.run()
@@ -68,8 +84,19 @@ func (knock *Knock) run() {
 	// wait either timeout or catch Ctrl-C
 	select {
 	case <-timeout_ctx.Done():
+		// timeout
+	case <-knock.finished:
+		// all tasks finished
 	case <-done:
+		// catch Ctrl-C
 	}
+
+	knock.gradeful_shutdown()
+}
+
+// the post-script for the Knock.
+func (knock *Knock) gradeful_shutdown() {
+	timeout := 4 * time.Second
 
 	// notify all worker stop
 	close(knock.closed)
@@ -82,6 +109,17 @@ func (knock *Knock) run() {
 
 func (knock Knock) DummyTask(closed <-chan struct{}) {
 	fmt.Println("start dummy task")
-	<-closed
+
+	timeout := 2 * time.Second
+	timeout_ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	select {
+	case <-timeout_ctx.Done():
+		// closed for task finished
+	case <-closed:
+		// closed by the main thread
+	}
+
 	fmt.Println("task closed")
 }
