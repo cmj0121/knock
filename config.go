@@ -2,6 +2,8 @@ package knock
 
 import (
 	"fmt"
+
+	_ "embed"
 )
 
 // the meta of this projecet
@@ -19,3 +21,6 @@ func Version() (ver string) {
 	ver = fmt.Sprintf("%s (%d.%d.%d)", PROJ_NAME, MACRO, MINOR, MACRO)
 	return
 }
+
+//go:embed assets/word-list
+var word_lists string

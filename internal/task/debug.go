@@ -1,9 +1,7 @@
 package task
 
 import (
-	"context"
 	"fmt"
-	"time"
 )
 
 func init() {
@@ -23,19 +21,18 @@ func (debug Debug) Name() (name string) {
 
 // execute the debug, show the word and wait closed
 func (debug Debug) Execute(ctx *Context) (err error) {
-	fmt.Println("start debug task")
-
-	timeout := 2 * time.Second
-	timeout_ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	select {
-	case <-timeout_ctx.Done():
-		// closed for task finished
-	case <-ctx.Closed:
-		// closed by the main thread
+	for {
+		select {
+		case token, running := <-ctx.Producer:
+			if !running {
+				// no-more token, close the task
+				return
+			}
+			// print the token
+			fmt.Println(token)
+		case <-ctx.Closed:
+			// closed by the main thread
+			return
+		}
 	}
-
-	fmt.Println("task closed")
-	return
 }

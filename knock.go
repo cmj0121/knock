@@ -1,11 +1,14 @@
 package knock
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -39,6 +42,8 @@ func (knock *Knock) Run() {
 	wg := sync.WaitGroup{}
 	task_name := "debug"
 
+	producer := knock.producer(strings.NewReader(word_lists))
+
 	switch runner, ok := task.GetTask(task_name); ok {
 	case false:
 		fmt.Printf("cannot find task: %v\n", task_name)
@@ -51,7 +56,8 @@ func (knock *Knock) Run() {
 				defer wg.Done()
 
 				ctx := task.Context{
-					Closed: knock.closed,
+					Closed:   knock.closed,
+					Producer: producer,
 				}
 
 				if err := runner.Execute(&ctx); err != nil {
@@ -109,6 +115,27 @@ func (knock *Knock) run() {
 	}
 
 	knock.gradeful_shutdown()
+}
+
+// generate the tokens to the tasks
+func (knock *Knock) producer(r io.Reader) (p <-chan string) {
+	ch := make(chan string, 1)
+
+	go func() {
+		defer close(ch)
+
+		scanner := bufio.NewScanner(r)
+		for scanner.Scan() {
+			select {
+			case <-knock.closed:
+				return
+			case ch <- scanner.Text():
+			}
+		}
+	}()
+
+	p = ch
+	return
 }
 
 // the post-script for the Knock.
