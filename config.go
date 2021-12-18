@@ -9,9 +9,9 @@ const (
 	// project name
 	PROJ_NAME = "knock"
 	// project version
-	MAJOR = 0	// the API version, bump when change interface
-	MINOR = 0	// bump when the new feature implemented
-	MACRO = 0	// bump when bug-fixed only
+	MAJOR = 0 // the API version, bump when change interface
+	MINOR = 0 // bump when the new feature implemented
+	MACRO = 0 // bump when bug-fixed only
 )
 
 // return the version info

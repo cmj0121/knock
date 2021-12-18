@@ -1,14 +1,16 @@
 package knock
 
 import (
-	"runtime"
-	"fmt"
-	"time"
-	"os"
-	"sync"
 	"context"
-    "os/signal"
-    "syscall"
+	"fmt"
+	"os"
+	"os/signal"
+	"runtime"
+	"sync"
+	"syscall"
+	"time"
+
+	"github.com/cmj0121/knock/internal/task"
 )
 
 // the knock instance, generate the word list, pass to the task and then
@@ -25,8 +27,8 @@ type Knock struct {
 
 func New() (knock *Knock) {
 	knock = &Knock{
-		Worker: runtime.NumCPU(),
-		closed: make(chan struct{}, 1),
+		Worker:   runtime.NumCPU(),
+		closed:   make(chan struct{}, 1),
 		finished: make(chan struct{}, 1),
 	}
 	return
@@ -35,14 +37,29 @@ func New() (knock *Knock) {
 // run the knock with provides arguments
 func (knock *Knock) Run() {
 	wg := sync.WaitGroup{}
+	task_name := "debug"
 
-	// start all the worker
-	for idx := 0; idx < knock.Worker; idx++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			knock.DummyTask(knock.closed)
-		}()
+	switch runner, ok := task.GetTask(task_name); ok {
+	case false:
+		fmt.Printf("cannot find task: %v\n", task_name)
+		return
+	default:
+		// start all the worker
+		for idx := 0; idx < knock.Worker; idx++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				ctx := task.Context{
+					Closed: knock.closed,
+				}
+
+				if err := runner.Execute(&ctx); err != nil {
+					// catch error, show the message
+					fmt.Println(err)
+				}
+			}()
+		}
 	}
 
 	// wait all task finished, and notify main thread
@@ -105,21 +122,4 @@ func (knock *Knock) gradeful_shutdown() {
 	// graceful shutdown
 	fmt.Println("start graceful shutdown...")
 	time.Sleep(timeout)
-}
-
-func (knock Knock) DummyTask(closed <-chan struct{}) {
-	fmt.Println("start dummy task")
-
-	timeout := 2 * time.Second
-	timeout_ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	select {
-	case <-timeout_ctx.Done():
-		// closed for task finished
-	case <-closed:
-		// closed by the main thread
-	}
-
-	fmt.Println("task closed")
 }

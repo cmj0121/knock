@@ -1,4 +1,4 @@
-SRC := $(wildcard *.go) $(wildcard */*.go)
+SRC := $(wildcard *.go) $(wildcard */*/*.go)
 BIN := $(subst .go,,$(wildcard cmd/*.go))
 
 .PHONY: all clean test run build upgrade help
@@ -17,7 +17,7 @@ test: 			# run test
 run:			# run in the local environment
 	go run cmd/knock.go
 
-build: $(BIN)	# build the binary
+build: $(BIN) test	# build the binary
 
 upgrade:		# upgrade all the necessary packages
 	pre-commit autoupdate
