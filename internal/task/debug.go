@@ -1,9 +1,5 @@
 package task
 
-import (
-	"fmt"
-)
-
 func init() {
 	// register debug task
 	RegisterTask(Debug{})
@@ -29,7 +25,10 @@ func (debug Debug) Execute(ctx *Context) (err error) {
 				return
 			}
 			// print the token
-			fmt.Println(token)
+			ctx.Collector <- Message{
+				Status: TRACE,
+				Msg:    token,
+			}
 		case <-ctx.Closed:
 			// closed by the main thread
 			return

@@ -26,27 +26,33 @@ type Knock struct {
 	closed chan struct{}
 	// the shared channel to notify main thread about all workers closed
 	finished chan struct{}
+	// the shared channel to collect the result from tasks
+	ch_collector chan task.Message
 }
 
 func New() (knock *Knock) {
 	knock = &Knock{
-		Worker:   runtime.NumCPU(),
-		closed:   make(chan struct{}, 1),
-		finished: make(chan struct{}, 1),
+		Worker:       runtime.NumCPU(),
+		closed:       make(chan struct{}, 1),
+		finished:     make(chan struct{}, 1),
+		ch_collector: make(chan task.Message, 1),
 	}
 	return
 }
 
 // run the knock with provides arguments
-func (knock *Knock) Run() {
+func (knock *Knock) Run() (err error) {
 	wg := sync.WaitGroup{}
 	task_name := "debug"
 
 	producer := knock.producer(strings.NewReader(word_lists))
 
+	// run the reducer to receive message
+	go knock.reducer()
+
 	switch runner, ok := task.GetTask(task_name); ok {
 	case false:
-		fmt.Printf("cannot find task: %v\n", task_name)
+		err = fmt.Errorf("cannot find task: %v\n", task_name)
 		return
 	default:
 		// start all the worker
@@ -56,13 +62,17 @@ func (knock *Knock) Run() {
 				defer wg.Done()
 
 				ctx := task.Context{
-					Closed:   knock.closed,
-					Producer: producer,
+					Closed:    knock.closed,
+					Producer:  producer,
+					Collector: knock.ch_collector,
 				}
 
 				if err := runner.Execute(&ctx); err != nil {
 					// catch error, show the message
-					fmt.Println(err)
+					knock.ch_collector <- task.Message{
+						Status: task.ERROR,
+						Msg:    fmt.Sprintf("execute task %#v: %v", task_name, err),
+					}
 				}
 			}()
 		}
@@ -76,6 +86,7 @@ func (knock *Knock) Run() {
 
 	// exactly run the knock, wait finished or catch Ctrl-C
 	knock.run()
+	return
 }
 
 // run the knock main thread and want tasks finished or force stop
@@ -90,9 +101,9 @@ func (knock *Knock) run() {
 		// wait signal or knock closed
 		select {
 		case <-knock.closed:
-			fmt.Println("main thread closed")
+			// main thread closed
 		case <-sigint:
-			fmt.Println("catch Ctrl-C")
+			// catch Ctrl-C
 		}
 
 		// notify knock should be closed
@@ -138,15 +149,36 @@ func (knock *Knock) producer(r io.Reader) (p <-chan string) {
 	return
 }
 
+// show the message
+func (knock *Knock) reducer() {
+	progress := 0
+	progress_bar := []string{"|", "/", "-", "\\"}
+
+	for {
+		select {
+		case <-knock.closed:
+			return
+		case message := <-knock.ch_collector:
+			switch message.Status {
+			case task.RESULT:
+				fmt.Printf("[%v] ........................ %v\n", "+", message.Msg)
+			case task.ERROR:
+				fmt.Printf("[%v] ........................ %v\n", "!", message.Msg)
+			case task.TRACE:
+				fmt.Printf("[%v] ........................ %v\n", progress_bar[progress], message.Msg)
+				progress = (progress + 1) % len(progress_bar)
+			default:
+				fmt.Printf("[%v] ........................ %v\n", "?", message.Msg)
+			}
+		}
+	}
+}
+
 // the post-script for the Knock.
 func (knock *Knock) gradeful_shutdown() {
-	timeout := 4 * time.Second
-
 	// notify all worker stop
 	close(knock.closed)
-	fmt.Println("all workers should be closed")
-
-	// graceful shutdown
-	fmt.Println("start graceful shutdown...")
-	time.Sleep(timeout)
+	// the final stesp need to execute after Knock stop
+	close(knock.ch_collector)
+	fmt.Println("\n~ Bye ~")
 }

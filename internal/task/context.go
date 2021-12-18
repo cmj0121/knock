@@ -7,4 +7,7 @@ type Context struct {
 
 	// the token producer (generate the token)
 	Producer <-chan string
+
+	// the message collector
+	Collector chan<- Message
 }
