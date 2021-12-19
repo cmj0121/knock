@@ -17,6 +17,12 @@ type Task interface {
 	// the name of the task, should be unique in the task pools
 	Name() string
 
+	// run the necessary prepared actions before executed
+	Prologue()
+
+	// run the necessary clean-up actions after task finished
+	Epilogue()
+
 	// execute the task with passed context, return error when fail
 	Execute(ctx *Context) error
 }

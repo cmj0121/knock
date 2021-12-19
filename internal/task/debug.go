@@ -15,6 +15,14 @@ func (debug Debug) Name() (name string) {
 	return
 }
 
+// run the necessary prepared actions before executed
+func (debug Debug) Prologue() {
+}
+
+// run the necessary clean-up actions after task finished
+func (debug Debug) Epilogue() {
+}
+
 // execute the debug, show the word and wait closed
 func (debug Debug) Execute(ctx *Context) (err error) {
 	for {

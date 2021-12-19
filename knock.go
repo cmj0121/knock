@@ -37,6 +37,8 @@ func New() (knock *Knock) {
 		finished:     make(chan struct{}, 1),
 		ch_collector: make(chan task.Message, 1),
 	}
+
+	knock.Worker = 3
 	return
 }
 
@@ -50,11 +52,14 @@ func (knock *Knock) Run() (err error) {
 	// run the reducer to receive message
 	go knock.reducer()
 
-	switch runner, ok := task.GetTask(task_name); ok {
+	runner, ok := task.GetTask(task_name)
+	switch ok {
 	case false:
 		err = fmt.Errorf("cannot find task: %v\n", task_name)
 		return
 	default:
+		runner.Prologue()
+
 		// start all the worker
 		for idx := 0; idx < knock.Worker; idx++ {
 			wg.Add(1)
@@ -81,6 +86,7 @@ func (knock *Knock) Run() (err error) {
 	// wait all task finished, and notify main thread
 	go func() {
 		wg.Wait()
+		runner.Epilogue()
 		close(knock.finished)
 	}()
 
@@ -165,7 +171,10 @@ func (knock *Knock) reducer() {
 			case task.ERROR:
 				fmt.Printf("[%v] ........................ %v\n", "!", message.Msg)
 			case task.TRACE:
-				fmt.Printf("[%v] ........................ %v\n", progress_bar[progress], message.Msg)
+				// 2K clear entire line and cursor position does not change
+				//  s saves the cursor position/state in SCO console mode
+				//  u restores the cursor position/state in SCO console mode
+				fmt.Printf("\x1b[s\x1b[u\x1b[2K[%v] ........................ %v\x1b[u", progress_bar[progress], message.Msg)
 				progress = (progress + 1) % len(progress_bar)
 			default:
 				fmt.Printf("[%v] ........................ %v\n", "?", message.Msg)
