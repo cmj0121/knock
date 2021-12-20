@@ -18,10 +18,10 @@ type Task interface {
 	Name() string
 
 	// run the necessary prepared actions before executed
-	Prologue()
+	Prologue(ctx *Context)
 
 	// run the necessary clean-up actions after task finished
-	Epilogue()
+	Epilogue(ctx *Context)
 
 	// execute the task with passed context, return error when fail
 	Execute(ctx *Context) error

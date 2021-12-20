@@ -1,5 +1,9 @@
 package task
 
+import (
+	"time"
+)
+
 func init() {
 	// register debug task
 	RegisterTask(Debug{})
@@ -16,11 +20,11 @@ func (debug Debug) Name() (name string) {
 }
 
 // run the necessary prepared actions before executed
-func (debug Debug) Prologue() {
+func (debug Debug) Prologue(ctx *Context) {
 }
 
 // run the necessary clean-up actions after task finished
-func (debug Debug) Epilogue() {
+func (debug Debug) Epilogue(ctx *Context) {
 }
 
 // execute the debug, show the word and wait closed
@@ -37,6 +41,8 @@ func (debug Debug) Execute(ctx *Context) (err error) {
 				Status: TRACE,
 				Msg:    token,
 			}
+
+			time.Sleep(time.Millisecond * 150)
 		case <-ctx.Closed:
 			// closed by the main thread
 			return
