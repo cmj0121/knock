@@ -16,6 +16,9 @@ type Web struct {
 	// the base URL path of the target
 	Base *string `desc:"the base URL"`
 
+	// skip the 404 webpage
+	Show404 bool `name:"404" desc:"show result of the 404 web page"`
+
 	*http.Client `-` //nolint
 	base_url     string
 }
@@ -78,9 +81,19 @@ func (web *Web) Execute(ctx *Context) (err error) {
 					Msg:    err.Error(),
 				}
 			default:
-				ctx.Collector <- Message{
-					Status: RESULT,
-					Msg:    fmt.Sprintf("[%v] %v", code, path),
+				switch {
+				case code == 404:
+					if web.Show404 {
+						ctx.Collector <- Message{
+							Status: RESULT,
+							Msg:    fmt.Sprintf("[%v] %v", code, path),
+						}
+					}
+				default:
+					ctx.Collector <- Message{
+						Status: RESULT,
+						Msg:    fmt.Sprintf("[%v] %v", code, path),
+					}
 				}
 			}
 		case <-ctx.Closed:
