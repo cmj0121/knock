@@ -53,13 +53,13 @@ func (dns *DNS) Execute(ctx *Context) (err error) {
 				return
 			}
 
-			hostname := strings.ToLower(fmt.Sprintf("%v.%v", token, dns.Hostname))
+			hostname := strings.ToLower(fmt.Sprintf("%v.%v", token, *dns.Hostname))
 			ctx.Collector <- Message{
 				Status: TRACE,
 				Msg:    hostname,
 			}
 
-			dns.execute(ctx, token)
+			dns.execute(ctx, hostname)
 		case <-ctx.Closed:
 			// closed by the main thread
 			return
