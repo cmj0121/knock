@@ -16,7 +16,8 @@ func (debug Debug) Name() (name string) {
 }
 
 // run the necessary prepared actions before executed
-func (debug Debug) Prologue(ctx *Context) {
+func (debug Debug) Prologue(ctx *Context) (err error) {
+	return
 }
 
 // run the necessary clean-up actions after task finished

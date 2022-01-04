@@ -27,7 +27,7 @@ func (dns DNS) Name() (name string) {
 }
 
 // initial the resource and load the possible wildcard IPs
-func (dns *DNS) Prologue(ctx *Context) {
+func (dns *DNS) Prologue(ctx *Context) (err error) {
 	dns.wildcard_ips, _ = net.LookupHost(fmt.Sprintf("IT_SHOULD_NOT_EXIST.%v", *dns.Hostname))
 	sort.Strings(dns.wildcard_ips)
 
@@ -37,6 +37,8 @@ func (dns *DNS) Prologue(ctx *Context) {
 			Msg:    fmt.Sprintf("[A/AAAA] *%-22s  %v", *dns.Hostname, dns.wildcard_ips),
 		}
 	}
+
+	return
 }
 
 // close everything

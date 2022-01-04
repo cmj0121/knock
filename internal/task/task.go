@@ -6,7 +6,7 @@ type Task interface {
 	Name() string
 
 	// run the necessary prepared actions before executed
-	Prologue(ctx *Context)
+	Prologue(ctx *Context) error
 
 	// run the necessary clean-up actions after task finished
 	Epilogue(ctx *Context)

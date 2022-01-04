@@ -91,7 +91,10 @@ func (knock *Knock) Run() (err error) {
 		runner = knock.Debug
 	}
 
-	runner.Prologue(&ctx)
+	if err = runner.Prologue(&ctx); err != nil {
+		err = fmt.Errorf("%v prologue: %v", runner.Name(), err)
+		return
+	}
 
 	// start all the worker
 	for idx := 0; idx < knock.Worker; idx++ {

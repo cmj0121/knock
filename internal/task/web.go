@@ -25,7 +25,7 @@ func (web Web) Name() (name string) {
 }
 
 // initial the http.Client
-func (web *Web) Prologue(ctx *Context) {
+func (web *Web) Prologue(ctx *Context) (err error) {
 	// The TLS setting
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
@@ -37,6 +37,8 @@ func (web *Web) Prologue(ctx *Context) {
 	web.Client = &http.Client{
 		Transport: tr,
 	}
+
+	return
 }
 
 // close everything
