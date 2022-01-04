@@ -5,18 +5,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/cmj0121/stropt"
 )
 
-func init() {
-	// register debug task
-	RegisterTask(&Web{})
-}
-
 type Web struct {
-	// the base URL path of the target
-	Base string
+	stropt.Model
 
-	*http.Client
+	// the base URL path of the target
+	Base *string `desc:"the base URL"`
+
+	*http.Client `-` //nolint
 }
 
 // show the unique name of the task
@@ -38,8 +37,6 @@ func (web *Web) Prologue(ctx *Context) {
 	web.Client = &http.Client{
 		Transport: tr,
 	}
-
-	web.Base = "https://cmj.tw"
 }
 
 // close everything
@@ -56,7 +53,7 @@ func (web *Web) Execute(ctx *Context) (err error) {
 				return
 			}
 
-			path := fmt.Sprintf("%v/%v", web.Base, token)
+			path := fmt.Sprintf("%v/%v", *web.Base, token)
 			// print the token
 			ctx.Collector <- Message{
 				Status: TRACE,

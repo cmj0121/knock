@@ -6,16 +6,15 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-)
 
-func init() {
-	// register debug task
-	RegisterTask(&DNS{})
-}
+	"github.com/cmj0121/stropt"
+)
 
 // The knock for DNS records.
 type DNS struct {
-	Hostname string `help:"The target hostname"`
+	stropt.Model
+
+	Hostname *string `default:"example.com" help:"The target hostname"`
 
 	// pre-load the possible wildcard ip
 	wildcard_ips []string
@@ -29,15 +28,13 @@ func (dns DNS) Name() (name string) {
 
 // initial the resource and load the possible wildcard IPs
 func (dns *DNS) Prologue(ctx *Context) {
-	dns.Hostname = "teaches.cc"
-
-	dns.wildcard_ips, _ = net.LookupHost(fmt.Sprintf("IT_SHOULD_NOT_EXIST.%v", dns.Hostname))
+	dns.wildcard_ips, _ = net.LookupHost(fmt.Sprintf("IT_SHOULD_NOT_EXIST.%v", *dns.Hostname))
 	sort.Strings(dns.wildcard_ips)
 
 	if len(dns.wildcard_ips) > 0 {
 		ctx.Collector <- Message{
 			Status: RESULT,
-			Msg:    fmt.Sprintf("[A/AAAA] *%-22s  %v", dns.Hostname, dns.wildcard_ips),
+			Msg:    fmt.Sprintf("[A/AAAA] *%-22s  %v", *dns.Hostname, dns.wildcard_ips),
 		}
 	}
 }

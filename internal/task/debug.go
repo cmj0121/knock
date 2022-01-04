@@ -1,12 +1,12 @@
 package task
 
-func init() {
-	// register debug task
-	RegisterTask(Debug{})
-}
+import (
+	"github.com/cmj0121/stropt"
+)
 
 // task used for debug, only show the work knock passed
 type Debug struct {
+	stropt.Model
 }
 
 // show the unique name of the task

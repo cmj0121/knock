@@ -23,9 +23,14 @@ type Knock struct {
 	stropt.Model
 
 	// number milliseconds to wait per each task
-	Wait int `shortcut:"w" desc:"number of milliseconds to wait per each task"`
+	Wait time.Duration `shortcut:"w" desc:"number of milliseconds to wait per each task"`
 	// number of the Worker
 	Worker int `shortcut:"W" desc:"number of worker"`
+
+	// the pre-defined task
+	*task.Debug `desc:"show the tokens only (default action)"`
+	*task.DNS   `desc:"try to find all possible DNS record"`
+	*task.Web   `desc:"try to find all possible web path"`
 
 	// the shared channel to notify workers closed
 	closed chan struct{}
@@ -39,6 +44,8 @@ func New() (knock *Knock) {
 	knock = &Knock{
 		Wait:   50,
 		Worker: runtime.NumCPU(),
+
+		Debug: &task.Debug{},
 
 		closed:       make(chan struct{}, 1),
 		finished:     make(chan struct{}, 1),
@@ -56,7 +63,6 @@ func (knock *Knock) Run() (err error) {
 	parser.Run()
 
 	wg := sync.WaitGroup{}
-	task_name := "debug"
 
 	producer := knock.producer(strings.NewReader(word_lists))
 
@@ -69,29 +75,32 @@ func (knock *Knock) Run() (err error) {
 		Collector: knock.ch_collector,
 	}
 
-	runner, ok := task.GetTask(task_name)
-	switch ok {
-	case false:
-		err = fmt.Errorf("cannot find task: %v\n", task_name)
-		return
+	var runner task.Task
+	switch {
+	case knock.DNS != nil:
+		runner = knock.DNS
+	case knock.Web != nil:
+		runner = knock.Web
 	default:
-		runner.Prologue(&ctx)
+		runner = knock.Debug
+	}
 
-		// start all the worker
-		for idx := 0; idx < knock.Worker; idx++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+	runner.Prologue(&ctx)
 
-				if err := runner.Execute(&ctx); err != nil {
-					// catch error, show the message
-					knock.ch_collector <- task.Message{
-						Status: task.ERROR,
-						Msg:    fmt.Sprintf("execute task %#v: %v", task_name, err),
-					}
+	// start all the worker
+	for idx := 0; idx < knock.Worker; idx++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			if err := runner.Execute(&ctx); err != nil {
+				// catch error, show the message
+				knock.ch_collector <- task.Message{
+					Status: task.ERROR,
+					Msg:    fmt.Sprintf("execute task %#v: %v", runner.Name(), err),
 				}
-			}()
-		}
+			}
+		}()
 	}
 
 	// wait all task finished, and notify main thread
