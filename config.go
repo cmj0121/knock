@@ -18,7 +18,7 @@ const (
 
 // return the version info
 func Version() (ver string) {
-	ver = fmt.Sprintf("%s (%d.%d.%d)", PROJ_NAME, MACRO, MINOR, MACRO)
+	ver = fmt.Sprintf("%s (v%d.%d.%d)", PROJ_NAME, MACRO, MINOR, MACRO)
 	return
 }
 
