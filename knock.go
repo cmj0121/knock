@@ -14,13 +14,18 @@ import (
 	"time"
 
 	"github.com/cmj0121/knock/internal/task"
+	"github.com/cmj0121/stropt"
 )
 
 // the knock instance, generate the word list, pass to the task and then
 // get the response.
 type Knock struct {
+	stropt.Model
+
+	// number milliseconds to wait per each task
+	Wait int `shortcut:"w" desc:"number of milliseconds to wait per each task"`
 	// number of the Worker
-	Worker int
+	Worker int `shortcut:"W" desc:"number of worker"`
 
 	// the shared channel to notify workers closed
 	closed chan struct{}
@@ -32,7 +37,9 @@ type Knock struct {
 
 func New() (knock *Knock) {
 	knock = &Knock{
-		Worker:       runtime.NumCPU(),
+		Wait:   50,
+		Worker: runtime.NumCPU(),
+
 		closed:       make(chan struct{}, 1),
 		finished:     make(chan struct{}, 1),
 		ch_collector: make(chan task.Message, 1),
@@ -44,6 +51,10 @@ func New() (knock *Knock) {
 
 // run the knock with provides arguments
 func (knock *Knock) Run() (err error) {
+	parser := stropt.MustNew(knock)
+	parser.Version(Version())
+	parser.Run()
+
 	wg := sync.WaitGroup{}
 	task_name := "debug"
 
@@ -138,6 +149,7 @@ func (knock *Knock) run() {
 func (knock *Knock) producer(r io.Reader) (p <-chan string) {
 	ch := make(chan string, 1)
 
+	wait := time.Millisecond * time.Duration(knock.Wait)
 	go func() {
 		defer close(ch)
 
@@ -148,6 +160,8 @@ func (knock *Knock) producer(r io.Reader) (p <-chan string) {
 				return
 			case ch <- scanner.Text():
 			}
+
+			time.Sleep(wait)
 		}
 	}()
 
