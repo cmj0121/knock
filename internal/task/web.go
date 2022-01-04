@@ -41,6 +41,9 @@ func (web *Web) Prologue(ctx *Context) (err error) {
 	// The default http client
 	web.Client = &http.Client{
 		Transport: tr,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	var u *url.URL
@@ -73,7 +76,7 @@ func (web *Web) Execute(ctx *Context) (err error) {
 				Msg:    path,
 			}
 
-			code, _, err := web.Do("GET", path)
+			code, location, _, err := web.Do("GET", path)
 			switch {
 			case err != nil:
 				ctx.Collector <- Message{
@@ -81,8 +84,20 @@ func (web *Web) Execute(ctx *Context) (err error) {
 					Msg:    err.Error(),
 				}
 			default:
-				switch {
-				case code == 404:
+				switch code {
+				case 301, 302:
+					if path+"/" == location {
+						ctx.Collector <- Message{
+							Status: RESULT,
+							Msg:    fmt.Sprintf("[%v] %v", code, path),
+						}
+					} else {
+						ctx.Collector <- Message{
+							Status: RESULT,
+							Msg:    fmt.Sprintf("[%v] %-42v -> %v", code, path, location),
+						}
+					}
+				case 404:
 					if web.Show404 {
 						ctx.Collector <- Message{
 							Status: RESULT,
@@ -103,13 +118,19 @@ func (web *Web) Execute(ctx *Context) (err error) {
 	}
 }
 
-func (web Web) Do(method, url string) (code int, html []byte, err error) {
+func (web Web) Do(method, url string) (code int, location string, html []byte, err error) {
 	var req *http.Request
 
 	if req, err = http.NewRequest(method, url, nil); err == nil {
 		var resp *http.Response
 		if resp, err = web.Client.Do(req); err == nil {
 			code = resp.StatusCode
+
+			if u, err := resp.Location(); err == nil {
+				// set the location
+				location = u.String()
+			}
+
 			html, _ = ioutil.ReadAll(resp.Body)
 			defer resp.Body.Close()
 		}
