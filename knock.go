@@ -51,8 +51,6 @@ func New() (knock *Knock) {
 		finished:     make(chan struct{}, 1),
 		ch_collector: make(chan task.Message, 1),
 	}
-
-	knock.Worker = 3
 	return
 }
 
