@@ -42,7 +42,7 @@ type Knock struct {
 
 func New() (knock *Knock) {
 	knock = &Knock{
-		Wait:   50,
+		Wait:   50 * time.Millisecond,
 		Worker: runtime.NumCPU(),
 
 		Debug: &task.Debug{},
@@ -158,7 +158,6 @@ func (knock *Knock) run() {
 func (knock *Knock) producer(r io.Reader) (p <-chan string) {
 	ch := make(chan string, 1)
 
-	wait := time.Millisecond * time.Duration(knock.Wait)
 	go func() {
 		defer close(ch)
 
@@ -170,7 +169,7 @@ func (knock *Knock) producer(r io.Reader) (p <-chan string) {
 			case ch <- scanner.Text():
 			}
 
-			time.Sleep(wait)
+			time.Sleep(knock.Wait)
 		}
 	}()
 
