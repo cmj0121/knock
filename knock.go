@@ -27,6 +27,8 @@ type Knock struct {
 	// number of the Worker
 	Worker int `shortcut:"W" desc:"number of worker"`
 
+	*os.File `shortcut:"f" attr:"flag" desc:"external word-list file"`
+
 	// the pre-defined task
 	*task.Debug `desc:"show the tokens only (default action)"`
 	*task.DNS   `desc:"try to find all possible DNS record"`
@@ -62,7 +64,13 @@ func (knock *Knock) Run() (err error) {
 
 	wg := sync.WaitGroup{}
 
-	producer := knock.producer(strings.NewReader(word_lists))
+	var producer <-chan string
+	switch knock.File {
+	case nil:
+		producer = knock.producer(strings.NewReader(word_lists))
+	default:
+		producer = knock.producer(knock.File)
+	}
 
 	// run the reducer to receive message
 	go knock.reducer()
