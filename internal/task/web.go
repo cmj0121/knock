@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 
 	"github.com/cmj0121/stropt"
 )
@@ -16,6 +17,7 @@ type Web struct {
 	Base *string `desc:"the base URL"`
 
 	*http.Client `-` //nolint
+	base_url     string
 }
 
 // show the unique name of the task
@@ -38,6 +40,12 @@ func (web *Web) Prologue(ctx *Context) (err error) {
 		Transport: tr,
 	}
 
+	var u *url.URL
+	if u, err = url.ParseRequestURI(*web.Base); err == nil {
+		// set the HTTP request URL
+		web.base_url = u.String()
+	}
+
 	return
 }
 
@@ -55,7 +63,7 @@ func (web *Web) Execute(ctx *Context) (err error) {
 				return
 			}
 
-			path := fmt.Sprintf("%v/%v", *web.Base, token)
+			path := fmt.Sprintf("%v/%v", web.base_url, token)
 			// print the token
 			ctx.Collector <- Message{
 				Status: TRACE,
