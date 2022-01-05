@@ -30,7 +30,7 @@ func (web Web) Name() (name string) {
 }
 
 // initial the http.Client
-func (web *Web) Prologue(ctx *Context) (err error) {
+func (web *Web) Prologue(ctx *Context) (mode TaskMode, err error) {
 	// The TLS setting
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{

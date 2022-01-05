@@ -16,7 +16,7 @@ func (debug Debug) Name() (name string) {
 }
 
 // run the necessary prepared actions before executed
-func (debug Debug) Prologue(ctx *Context) (err error) {
+func (debug Debug) Prologue(ctx *Context) (mode TaskMode, err error) {
 	return
 }
 

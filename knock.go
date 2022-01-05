@@ -102,7 +102,7 @@ func (knock *Knock) Run() (err error) {
 		runner = knock.Debug
 	}
 
-	if err = runner.Prologue(&ctx); err != nil {
+	if _, err = runner.Prologue(&ctx); err != nil {
 		err = fmt.Errorf("%v prologue: %v", runner.Name(), err)
 		return
 	}
