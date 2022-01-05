@@ -5,8 +5,8 @@ type TaskMode int
 
 const (
 	M_INIT TaskMode = 1 << iota
-	// run as single worker
-	M_SINGLE
+	// run with no producer
+	M_NO_PRODUCER
 )
 
 // the interface of the task executed by the knock.

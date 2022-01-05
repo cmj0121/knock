@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"regexp"
 
 	"github.com/cmj0121/stropt"
 )
@@ -19,6 +20,8 @@ type Web struct {
 
 	// skip the 404 webpage
 	Show404 bool `name:"404" desc:"show result of the 404 web page"`
+	// scan the sensitive page
+	Sensitive bool `shortcut:"s" desc:"only scan the sensitive info in target URL"`
 
 	*http.Client   `-` //nolint
 	base_url       string
@@ -54,12 +57,11 @@ func (web *Web) Prologue(ctx *Context) (mode TaskMode, err error) {
 		web.base_url = u.String()
 	}
 
-	code, _, html, _ := web.Do("GET", *web.Base)
+	_, _, web.html_main_page, _ = web.Do("GET", *web.Base)
+
 	switch {
-	case code >= 300 && code < 400:
-		fallthrough
-	case code >= 400 && code < 500:
-		web.html_main_page = html
+	case web.Sensitive:
+		mode = M_NO_PRODUCER
 	}
 
 	return
@@ -79,8 +81,13 @@ func (web *Web) Execute(ctx *Context) (err error) {
 				return
 			}
 
-			path := fmt.Sprintf("%v/%v", web.base_url, token)
-			web.scan_web_path(ctx, path)
+			switch {
+			case web.Sensitive:
+				web.scan_web_sensitive(ctx)
+			default:
+				path := fmt.Sprintf("%v/%v", web.base_url, token)
+				web.scan_web_path(ctx, path)
+			}
 		case <-ctx.Closed:
 			// closed by the main thread
 			return
@@ -95,7 +102,7 @@ func (web *Web) scan_web_path(ctx *Context, path string) {
 		Msg:    path,
 	}
 
-	code, location, html, err := web.Do("GET", path)
+	code, header, html, err := web.Do("GET", path)
 	switch {
 	case err != nil:
 		ctx.Collector <- Message{
@@ -103,6 +110,8 @@ func (web *Web) scan_web_path(ctx *Context, path string) {
 			Msg:    err.Error(),
 		}
 	default:
+		location := header.Get("Location")
+
 		switch code {
 		case 301, 302:
 			if path+"/" == location {
@@ -136,19 +145,32 @@ func (web *Web) scan_web_path(ctx *Context, path string) {
 	}
 }
 
-func (web Web) Do(method, url string) (code int, location string, html []byte, err error) {
+func (web *Web) scan_web_sensitive(ctx *Context) {
+	re_comment := regexp.MustCompile(`<!--.+?-->`)
+	for _, comment := range re_comment.FindAll(web.html_main_page, -1) {
+		ctx.Collector <- Message{
+			Status: RESULT,
+			Msg:    fmt.Sprintf("[comment] %v", string(comment)),
+		}
+	}
+
+	re_link := regexp.MustCompile(`(src|href|action)=['"].*?['"]`)
+	for _, comment := range re_link.FindAll(web.html_main_page, -1) {
+		ctx.Collector <- Message{
+			Status: RESULT,
+			Msg:    fmt.Sprintf("[link] %v", string(comment)),
+		}
+	}
+}
+
+func (web Web) Do(method, url string) (code int, header http.Header, html []byte, err error) {
 	var req *http.Request
 
 	if req, err = http.NewRequest(method, url, nil); err == nil {
 		var resp *http.Response
 		if resp, err = web.Client.Do(req); err == nil {
 			code = resp.StatusCode
-
-			if u, err := resp.Location(); err == nil {
-				// set the location
-				location = u.String()
-			}
-
+			header = resp.Header
 			html, _ = ioutil.ReadAll(resp.Body)
 			defer resp.Body.Close()
 		}
