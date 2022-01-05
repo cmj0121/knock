@@ -29,6 +29,8 @@ type Knock struct {
 	Worker int `shortcut:"W" desc:"number of worker"`
 	// random the word-list
 	Random bool `shortcut:"R" desc:"random the word-list"`
+	// set the progress message disable
+	Silence bool `shortcut:"s" desc:"do not show the progress message"`
 
 	*os.File `shortcut:"f" attr:"flag" desc:"external word-list file"`
 
@@ -65,6 +67,11 @@ func (knock *Knock) Run() (err error) {
 	parser := stropt.MustNew(knock)
 	parser.Version(Version())
 	parser.Run()
+
+	if knock.Wait == 0 {
+		// set silence when wait=0
+		knock.Silence = true
+	}
 
 	wg := sync.WaitGroup{}
 
@@ -241,8 +248,10 @@ func (knock *Knock) reducer() {
 				// 2K clear entire line and cursor position does not change
 				//  s saves the cursor position/state in SCO console mode
 				//  u restores the cursor position/state in SCO console mode
-				fmt.Printf("\x1b[s\x1b[2K[%v] ........................ %v\x1b[u", progress_bar[progress], message.Msg)
-				progress = (progress + 1) % len(progress_bar)
+				if !knock.Silence {
+					fmt.Printf("\x1b[s\x1b[2K[%v] ........................ %v\x1b[u", progress_bar[progress], message.Msg)
+					progress = (progress + 1) % len(progress_bar)
+				}
 				show_progress = true
 			default:
 				fmt.Printf("[%v] ........................ %v\n", "?", message.Msg)
