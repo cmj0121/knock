@@ -1,6 +1,7 @@
 package task
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
@@ -19,8 +20,9 @@ type Web struct {
 	// skip the 404 webpage
 	Show404 bool `name:"404" desc:"show result of the 404 web page"`
 
-	*http.Client `-` //nolint
-	base_url     string
+	*http.Client   `-` //nolint
+	base_url       string
+	html_main_page []byte
 }
 
 // show the unique name of the task
@@ -52,6 +54,14 @@ func (web *Web) Prologue(ctx *Context) (mode TaskMode, err error) {
 		web.base_url = u.String()
 	}
 
+	code, _, html, _ := web.Do("GET", *web.Base)
+	switch {
+	case code >= 300 && code < 400:
+		fallthrough
+	case code >= 400 && code < 500:
+		web.html_main_page = html
+	}
+
 	return
 }
 
@@ -70,50 +80,58 @@ func (web *Web) Execute(ctx *Context) (err error) {
 			}
 
 			path := fmt.Sprintf("%v/%v", web.base_url, token)
-			// print the token
-			ctx.Collector <- Message{
-				Status: TRACE,
-				Msg:    path,
-			}
-
-			code, location, _, err := web.Do("GET", path)
-			switch {
-			case err != nil:
-				ctx.Collector <- Message{
-					Status: ERROR,
-					Msg:    err.Error(),
-				}
-			default:
-				switch code {
-				case 301, 302:
-					if path+"/" == location {
-						ctx.Collector <- Message{
-							Status: RESULT,
-							Msg:    fmt.Sprintf("[%v] %v", code, path),
-						}
-					} else {
-						ctx.Collector <- Message{
-							Status: RESULT,
-							Msg:    fmt.Sprintf("[%v] %-42v -> %v", code, path, location),
-						}
-					}
-				case 404:
-					if web.Show404 {
-						ctx.Collector <- Message{
-							Status: RESULT,
-							Msg:    fmt.Sprintf("[%v] %v", code, path),
-						}
-					}
-				default:
-					ctx.Collector <- Message{
-						Status: RESULT,
-						Msg:    fmt.Sprintf("[%v] %v", code, path),
-					}
-				}
-			}
+			web.scan_web_path(ctx, path)
 		case <-ctx.Closed:
 			// closed by the main thread
 			return
+		}
+	}
+}
+
+func (web *Web) scan_web_path(ctx *Context, path string) {
+	// print the token
+	ctx.Collector <- Message{
+		Status: TRACE,
+		Msg:    path,
+	}
+
+	code, location, html, err := web.Do("GET", path)
+	switch {
+	case err != nil:
+		ctx.Collector <- Message{
+			Status: ERROR,
+			Msg:    err.Error(),
+		}
+	default:
+		switch code {
+		case 301, 302:
+			if path+"/" == location {
+				ctx.Collector <- Message{
+					Status: RESULT,
+					Msg:    fmt.Sprintf("[%v] %v", code, path),
+				}
+			} else {
+				ctx.Collector <- Message{
+					Status: RESULT,
+					Msg:    fmt.Sprintf("[%v] %-42v -> %v", code, path, location),
+				}
+			}
+		case 404:
+			if web.Show404 {
+				ctx.Collector <- Message{
+					Status: RESULT,
+					Msg:    fmt.Sprintf("[%v] %v", code, path),
+				}
+			}
+		default:
+			switch {
+			case bytes.Equal(html, web.html_main_page):
+			default:
+				ctx.Collector <- Message{
+					Status: RESULT,
+					Msg:    fmt.Sprintf("[%v] %v", code, path),
+				}
+			}
 		}
 	}
 }
