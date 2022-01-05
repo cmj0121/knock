@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"os/signal"
 	"runtime"
@@ -26,6 +27,8 @@ type Knock struct {
 	Wait time.Duration `shortcut:"w" desc:"number of milliseconds to wait per each task"`
 	// number of the Worker
 	Worker int `shortcut:"W" desc:"number of worker"`
+	// random the word-list
+	Random bool `shortcut:"R" desc:"random the word-list"`
 
 	*os.File `shortcut:"f" attr:"flag" desc:"external word-list file"`
 
@@ -46,6 +49,7 @@ func New() (knock *Knock) {
 	knock = &Knock{
 		Wait:   50 * time.Millisecond,
 		Worker: runtime.NumCPU(),
+		Random: true,
 
 		Debug: &task.Debug{},
 
@@ -171,11 +175,34 @@ func (knock *Knock) producer(r io.Reader) (p <-chan string) {
 		defer close(ch)
 
 		scanner := bufio.NewScanner(r)
+		token_buff := []string{}
+
 		for scanner.Scan() {
+			token := scanner.Text()
+
+			if knock.Random {
+				token_buff = append(token_buff, token)
+				continue
+			}
+
 			select {
 			case <-knock.closed:
 				return
-			case ch <- scanner.Text():
+			case ch <- token:
+			}
+
+			time.Sleep(knock.Wait)
+		}
+
+		rand.Shuffle(len(token_buff), func(i, j int) {
+			token_buff[i], token_buff[j] = token_buff[j], token_buff[i]
+		})
+
+		for idx := range token_buff {
+			select {
+			case <-knock.closed:
+				return
+			case ch <- token_buff[idx]:
 			}
 
 			time.Sleep(knock.Wait)
