@@ -32,6 +32,8 @@ type Knock struct {
 	// set the progress message disable
 	Silence bool `shortcut:"s" desc:"do not show the progress message"`
 
+	Token *string `shortcut:"t" attr:"flag" desc:"test on the specified token"`
+
 	*os.File `shortcut:"f" attr:"flag" desc:"external word-list file"`
 
 	// the pre-defined task
@@ -167,6 +169,8 @@ func (knock *Knock) run_producer_reducer(no_producer bool) (producer <-chan stri
 	switch {
 	case no_producer:
 		producer = knock.producer(strings.NewReader("."))
+	case knock.Token != nil:
+		producer = knock.producer(strings.NewReader(*knock.Token))
 	case knock.File == nil:
 		producer = knock.producer(strings.NewReader(word_lists))
 	default:
