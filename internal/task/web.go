@@ -22,6 +22,9 @@ type Web struct {
 	Show404 bool `name:"404" desc:"show result of the 404 web page"`
 	// scan the sensitive page
 	Sensitive bool `shortcut:"s" desc:"only scan the sensitive info in target URL"`
+	// only works when set sensitive
+	NoComment bool `shortcut:"C" name:"no-comment" desc:"show sensitive comment"`
+	NoHost    bool `shortcut:"H" name:"no-host" desc:"show sensitive host"`
 
 	*http.Client   `-` //nolint
 	base_url       string
@@ -146,19 +149,23 @@ func (web *Web) scan_web_path(ctx *Context, path string) {
 }
 
 func (web *Web) scan_web_sensitive(ctx *Context) {
-	re_comment := regexp.MustCompile(`<!--.+?-->`)
-	for _, comment := range re_comment.FindAll(web.html_main_page, -1) {
-		ctx.Collector <- Message{
-			Status: RESULT,
-			Msg:    fmt.Sprintf("[comment] %v", string(comment)),
+	if !web.NoComment {
+		re_comment := regexp.MustCompile(`<!--.+?-->`)
+		for _, comment := range re_comment.FindAll(web.html_main_page, -1) {
+			ctx.Collector <- Message{
+				Status: RESULT,
+				Msg:    fmt.Sprintf("[comment] %v", string(comment)),
+			}
 		}
 	}
 
-	re_link := regexp.MustCompile(`(src|href|action)=['"].*?['"]`)
-	for _, comment := range re_link.FindAll(web.html_main_page, -1) {
-		ctx.Collector <- Message{
-			Status: RESULT,
-			Msg:    fmt.Sprintf("[link] %v", string(comment)),
+	if !web.NoHost {
+		re_link := regexp.MustCompile(`(src|href|action)=['"]((http|https):)?//.*?['"]`)
+		for _, comment := range re_link.FindAll(web.html_main_page, -1) {
+			ctx.Collector <- Message{
+				Status: RESULT,
+				Msg:    fmt.Sprintf("[link] %v", string(comment)),
+			}
 		}
 	}
 }
