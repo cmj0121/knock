@@ -26,6 +26,8 @@ type Web struct {
 	NoComment bool `shortcut:"C" name:"no-comment" desc:"show sensitive comment"`
 	NoHost    bool `shortcut:"H" name:"no-host" desc:"show sensitive host"`
 
+	UserAgent string `name:"user-agent" default:"knock/web" desc:"customized user agent"`
+
 	*http.Client   `-` //nolint
 	base_url       string
 	html_main_page []byte
@@ -174,6 +176,9 @@ func (web Web) Do(method, url string) (code int, header http.Header, html []byte
 	var req *http.Request
 
 	if req, err = http.NewRequest(method, url, nil); err == nil {
+		// override the useragent
+		req.Header.Set("User-Agent", web.UserAgent)
+
 		var resp *http.Response
 		if resp, err = web.Client.Do(req); err == nil {
 			code = resp.StatusCode
