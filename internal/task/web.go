@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 
 	"github.com/cmj0121/stropt"
 )
@@ -54,6 +55,14 @@ func (web *Web) Prologue(ctx *Context) (mode TaskMode, err error) {
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
+	}
+
+	switch {
+	case strings.HasPrefix(*web.Base, "http://"):
+	case strings.HasPrefix(*web.Base, "https://"):
+	default:
+		// no http schema, append http by-default
+		*web.Base = fmt.Sprintf("http://%v", *web.Base)
 	}
 
 	var u *url.URL
