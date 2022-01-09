@@ -1,5 +1,10 @@
 package task
 
+import (
+	"net"
+	"time"
+)
+
 // the task mode, return from prologue
 type TaskMode int
 
@@ -22,4 +27,34 @@ type Task interface {
 
 	// execute the task with passed context, return error when fail
 	Execute(ctx *Context) error
+}
+
+func CIDRProducer(ctx *Context, cidr *net.IPNet) (producer <-chan string) {
+	tmp := make(chan string)
+
+	ip_inc := func(ip net.IP) {
+		for i := len(ip) - 1; i >= 0; i-- {
+			ip[i]++
+			if ip[i] > 0 {
+				break
+			}
+		}
+	}
+
+	go func() {
+		defer close(tmp)
+
+		for ip := cidr.IP.Mask(cidr.Mask); cidr.Contains(ip); ip_inc(ip) {
+			select {
+			case <-ctx.Closed:
+				return
+			case tmp <- ip.String():
+			}
+
+			time.Sleep(ctx.Wait)
+		}
+	}()
+
+	producer = tmp
+	return
 }

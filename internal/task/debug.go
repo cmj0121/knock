@@ -1,12 +1,17 @@
 package task
 
 import (
+	"net"
+
 	"github.com/cmj0121/stropt"
 )
 
 // task used for debug, only show the work knock passed
 type Debug struct {
 	stropt.Model
+
+	// the target CIDR want to search
+	CIDR *net.IPNet
 }
 
 // show the unique name of the task
@@ -17,6 +22,12 @@ func (debug Debug) Name() (name string) {
 
 // run the necessary prepared actions before executed
 func (debug Debug) Prologue(ctx *Context) (mode TaskMode, err error) {
+	switch debug.CIDR {
+	case nil:
+	default:
+		// set the customized producer
+		ctx.Producer = CIDRProducer(ctx, debug.CIDR)
+	}
 	return
 }
 

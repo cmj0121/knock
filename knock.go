@@ -88,6 +88,7 @@ func (knock *Knock) Run() (err error) {
 	wg := sync.WaitGroup{}
 	ctx := task.Context{
 		Closed:    knock.closed,
+		Wait:      knock.Wait,
 		Collector: knock.ch_collector,
 	}
 
@@ -96,7 +97,8 @@ func (knock *Knock) Run() (err error) {
 		err = fmt.Errorf("%v prologue: %v", runner.Name(), err)
 		return
 	}
-	ctx.Producer = knock.run_producer_reducer(mode&task.M_NO_PRODUCER != 0)
+
+	ctx.Producer = knock.run_producer_reducer(&ctx, mode)
 
 	// start all the worker
 	for idx := 0; idx < knock.Worker; idx++ {
@@ -165,12 +167,15 @@ func (knock *Knock) run() {
 	knock.gradeful_shutdown()
 }
 
-func (knock *Knock) run_producer_reducer(no_producer bool) (producer <-chan string) {
+func (knock *Knock) run_producer_reducer(ctx *task.Context, mode task.TaskMode) (producer <-chan string) {
 	switch {
-	case no_producer:
-		producer = knock.producer(strings.NewReader("."))
 	case knock.Token != nil:
 		producer = knock.producer(strings.NewReader(*knock.Token))
+	case ctx.Producer != nil:
+		// already create the producer
+		producer = ctx.Producer
+	case mode&task.M_NO_PRODUCER != 0:
+		producer = knock.producer(strings.NewReader("."))
 	case knock.File == nil:
 		producer = knock.producer(strings.NewReader(word_lists))
 	default:
