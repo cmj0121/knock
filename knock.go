@@ -2,7 +2,6 @@ package knock
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -152,15 +151,8 @@ func (knock *Knock) run() {
 		close(done)
 	}()
 
-	// set timeout for the main process
-	timeout := 4 * time.Second
-	timeout_ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	// wait either timeout or catch Ctrl-C
 	select {
-	case <-timeout_ctx.Done():
-		// timeout
 	case <-knock.finished:
 		// all tasks finished
 	case <-done:
