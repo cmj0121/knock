@@ -3,6 +3,7 @@ package task
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/cmj0121/stropt"
 	"github.com/go-ping/ping"
@@ -10,6 +11,8 @@ import (
 
 type Find struct {
 	stropt.Model
+
+	Timeout time.Duration `default:"100ms" desc:"timeout when try to connect to host"`
 
 	// the target CIDR want to search
 	CIDR *net.IPNet `default:"127.0.0.1/24" desc:"the target CIDR"`
@@ -37,7 +40,7 @@ func (find Find) Epilogue(ctx *Context) {
 }
 
 // find the host by the given token
-func (find Find) Execute(ctx *Context) (err error) {
+func (find *Find) Execute(ctx *Context) (err error) {
 	for {
 		select {
 		case token, running := <-ctx.Producer:
@@ -54,6 +57,7 @@ func (find Find) Execute(ctx *Context) (err error) {
 			switch pinger, err := ping.NewPinger(token); err {
 			case nil:
 				pinger.Count = 1
+				pinger.Timeout = find.Timeout
 				pinger.OnRecv = func(pkt *ping.Packet) {
 					ctx.Collector <- Message{
 						Status: RESULT,
