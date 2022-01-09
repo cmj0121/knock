@@ -1,8 +1,4 @@
-github.com/cmj0121/stropt v0.1.0 h1:wE5vZlKepbERfSp9htAkX9K+uabco4dMKqtABnZaLgY=
-github.com/cmj0121/stropt v0.1.0/go.mod h1:O/BqBhz7ICu7unEUALU/LbB0VDwGh1LPvHjMi/FpZf0=
-github.com/cmj0121/stropt v0.2.0 h1:A0LooMaai54DTIfz8h4OEh9Jt2RirpY92M8VhyutFSM=
-github.com/cmj0121/stropt v0.2.0/go.mod h1:O/BqBhz7ICu7unEUALU/LbB0VDwGh1LPvHjMi/FpZf0=
-github.com/cmj0121/stropt v0.2.1 h1:962svO3NYmuf34/yGo6UdCOi0q8ZPL4Fl7DhZebBjWc=
-github.com/cmj0121/stropt v0.2.1/go.mod h1:O/BqBhz7ICu7unEUALU/LbB0VDwGh1LPvHjMi/FpZf0=
-github.com/cmj0121/trace v0.0.0-20211226085626-862580c60082 h1:P0SNXos07iA2DsliXnIA52wBRsAgeqKSiyTLmtYtjuw=
-github.com/cmj0121/trace v0.0.0-20211226085626-862580c60082/go.mod h1:oWqsFFkwHRm69o4ayA1twMCllfI3kkjxzx+GpRi0TJE=
+github.com/cmj0121/stropt v0.3.4 h1:K9/UaQgHqlTMv4gFaeX8ezB8qB5D1WdQlJfx1J/0k+s=
+github.com/cmj0121/stropt v0.3.4/go.mod h1:nvXW/GtYpd1UtnXb/Qf1sG3RyRV1kyffVbW5Jd9aPcY=
+github.com/cmj0121/trace v0.1.0 h1:HzK2Az0Q1f6afWCdmuz/QizAMje8rT9bp9qF4VeGEn8=
+github.com/cmj0121/trace v0.1.0/go.mod h1:oWqsFFkwHRm69o4ayA1twMCllfI3kkjxzx+GpRi0TJE=
