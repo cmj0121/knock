@@ -40,6 +40,7 @@ type Knock struct {
 	*task.Debug `desc:"show the tokens only (default action)"`
 	*task.DNS   `desc:"try to find all possible DNS record"`
 	*task.Web   `desc:"try to find all possible web path"`
+	*task.Find  `desc:"try to find the host by given token"`
 
 	// the shared channel to notify workers closed
 	closed chan struct{}
@@ -81,6 +82,8 @@ func (knock *Knock) Run() (err error) {
 		runner = knock.DNS
 	case knock.Web != nil:
 		runner = knock.Web
+	case knock.Find != nil:
+		runner = knock.Find
 	default:
 		runner = knock.Debug
 	}
