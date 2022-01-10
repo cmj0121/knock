@@ -195,6 +195,7 @@ func (knock *Knock) producer(r io.Reader) (p <-chan string) {
 			token_buff = append(token_buff, token)
 		}
 
+		rand.Seed(int64(time.Now().Nanosecond()))
 		rand.Shuffle(len(token_buff), func(i, j int) {
 			token_buff[i], token_buff[j] = token_buff[j], token_buff[i]
 		})
