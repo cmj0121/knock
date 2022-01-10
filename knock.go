@@ -26,8 +26,6 @@ type Knock struct {
 	Wait time.Duration `shortcut:"w" desc:"number of milliseconds to wait per each task"`
 	// number of the Worker
 	Worker int `shortcut:"W" desc:"number of worker"`
-	// random the word-list
-	Random bool `shortcut:"R" desc:"random the word-list"`
 	// set the progress message disable
 	Silence bool `shortcut:"s" desc:"do not show the progress message"`
 
@@ -53,7 +51,6 @@ func New() (knock *Knock) {
 	knock = &Knock{
 		Wait:   50 * time.Millisecond,
 		Worker: runtime.NumCPU(),
-		Random: true,
 
 		Debug: &task.Debug{},
 
@@ -195,19 +192,7 @@ func (knock *Knock) producer(r io.Reader) (p <-chan string) {
 
 		for scanner.Scan() {
 			token := scanner.Text()
-
-			if knock.Random {
-				token_buff = append(token_buff, token)
-				continue
-			}
-
-			select {
-			case <-knock.closed:
-				return
-			case ch <- token:
-			}
-
-			time.Sleep(knock.Wait)
+			token_buff = append(token_buff, token)
 		}
 
 		rand.Shuffle(len(token_buff), func(i, j int) {
