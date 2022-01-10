@@ -91,13 +91,16 @@ func (knock *Knock) Run() (err error) {
 		Collector: knock.ch_collector,
 	}
 
+	// run the reducer to receive message
+	go knock.reducer()
+
 	var mode task.TaskMode
 	if mode, err = runner.Prologue(&ctx); err != nil {
 		err = fmt.Errorf("%v prologue: %v", runner.Name(), err)
 		return
 	}
 
-	ctx.Producer = knock.run_producer_reducer(&ctx, mode)
+	ctx.Producer = knock.run_producer(&ctx, mode)
 
 	// start all the worker
 	for idx := 0; idx < knock.Worker; idx++ {
@@ -159,7 +162,7 @@ func (knock *Knock) run() {
 	knock.gradeful_shutdown()
 }
 
-func (knock *Knock) run_producer_reducer(ctx *task.Context, mode task.TaskMode) (producer <-chan string) {
+func (knock *Knock) run_producer(ctx *task.Context, mode task.TaskMode) (producer <-chan string) {
 	switch {
 	case knock.Token != nil:
 		producer = knock.producer(strings.NewReader(*knock.Token))
@@ -173,9 +176,6 @@ func (knock *Knock) run_producer_reducer(ctx *task.Context, mode task.TaskMode) 
 	default:
 		producer = knock.producer(knock.File)
 	}
-
-	// run the reducer to receive message
-	go knock.reducer()
 
 	return
 }
