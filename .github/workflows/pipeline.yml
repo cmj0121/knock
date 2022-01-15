@@ -19,5 +19,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v1
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '^1.17'
+      - run: go version
       - run: gofmt -s -w `find . -name '*.go' -type f`
       - run: go test -bench=. -cover -failfast -benchmem -v -cover -failfast -timeout 2s ./...
