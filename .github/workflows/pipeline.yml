@@ -1,0 +1,23 @@
+name: compliance
+
+on:
+  push:
+    branches:
+      # run on each branch when push
+      - '*'
+    tags-ignore:
+      # ignore all the tag
+      - '*'
+  pull_request:
+    branches:
+      # only consider the PR to master branch
+      - master
+
+jobs:
+  container-job:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+      - run: gofmt -s -w `find . -name '*.go' -type f`
+      - run: go test -bench=. -cover -failfast -benchmem -v -cover -failfast -timeout 2s ./...
