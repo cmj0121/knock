@@ -1,9 +1,11 @@
 package knock
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/alecthomas/kong"
+	"github.com/cmj0121/knock/task/producer"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -13,6 +15,11 @@ type Knock struct {
 	// the command-line options
 	Debug bool `short:"d" help:"Show the debug message (auto apply --pretty-logger, -vvvv)."`
 
+	// the external wordlist
+	File *os.File `xor:"file,ip" short:"f" help:"The external word-list file."`
+	IP   string   `xor:"file,ip" short:"i" help:"The valid IP/mask"`
+
+	// the logger options
 	Quiet        bool `short:"q" group:"logger" xor:"verbose,quiet" help:"Disable all logger."`
 	Verbose      int  `short:"v" group:"logger" xor:"verbose,quiet" type:"counter" help:"Show the verbose logger."`
 	PrettyLogger bool `group:"logger" help:"Show the pretty logger."`
@@ -26,13 +33,34 @@ func New() (knock *Knock) {
 
 // run the knock, parse by the passed arguments from CLI and return
 // the result.
-func (knock *Knock) Run() (exitcode int) {
+func (knock *Knock) Run() int {
 	kong.Parse(knock)
 
 	knock.prologue()
+	return knock.run()
+}
+
+func (knock *Knock) run() (exitcode int) {
 	log.Info().Msg("start Knock ...")
 
-	exitcode = 0
+	var p producer.Producer
+
+	switch knock.IP {
+	case "":
+		p = producer.NewReaderProducer(knock.File)
+	default:
+		var err error
+
+		if p, err = producer.NewCIDRProducer(knock.IP); err != nil {
+			log.Error().Err(err).Msg("invalid IP")
+			return 1
+		}
+	}
+
+	for word := range p.Produce() {
+		fmt.Println(word)
+	}
+
 	return
 }
 
