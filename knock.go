@@ -78,6 +78,7 @@ func (knock *Knock) run() (exitcode int) {
 		return 1
 	}
 
+	log.Info().Msg("finish knock ...")
 	return
 }
 

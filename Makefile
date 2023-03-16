@@ -1,4 +1,4 @@
-SRC := $(wildcard *.go) $(wildcard */*/*.go)
+SRC := $(shell find . -name '*.go')
 BIN := $(subst .go,,$(wildcard cmd/*.go))
 
 .PHONY: all clean test run build upgrade install help

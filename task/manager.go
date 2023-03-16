@@ -1,8 +1,11 @@
 package task
 
 import (
-	"sync"
 	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/cmj0121/knock/task/producer"
@@ -18,10 +21,11 @@ func New(name string) (m *TaskManager, err error) {
 		return
 	}
 
-	m = &TaskManager {
+	m = &TaskManager{
 		w: w,
 		c: 1,
 	}
+
 	return
 }
 
@@ -57,9 +61,10 @@ func (m *TaskManager) Wait(t time.Duration) (err error) {
 
 // execute the task by the passed producer
 func (m *TaskManager) Run(p producer.Producer) (err error) {
-	var wg sync.WaitGroup
-
 	producer := p.Produce(m.t)
+	defer p.Close()
+
+	var wg sync.WaitGroup
 	// create worker and run via goroutine
 	for i := 0; i < m.c; i++ {
 		// create the new worker instance, and run with producer
@@ -79,8 +84,28 @@ func (m *TaskManager) Run(p producer.Producer) (err error) {
 				log.Error().Err(err).Msg("run worker fail")
 			}
 		}()
+
+		log.Info().Int("index", i).Msg("create worker")
 	}
 
-	wg.Wait()
+	done := make(chan struct{}, 1)
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	m.gracefulShutdown(done)
 	return
+}
+
+func (m *TaskManager) gracefulShutdown(done <-chan struct{}) {
+	sigint := make(chan os.Signal, 1)
+	defer close(sigint)
+
+	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case <-sigint:
+		log.Info().Msg("detect SIGINT and start graceful shutdown")
+	case <-done:
+	}
 }
