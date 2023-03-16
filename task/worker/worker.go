@@ -10,6 +10,9 @@ type Worker interface {
 	// the unique name of worker
 	Name() string
 
+	// show the help message
+	Help() string
+
 	// open with necessary resources
 	Open() error
 

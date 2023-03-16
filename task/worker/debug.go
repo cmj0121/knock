@@ -20,6 +20,11 @@ func (Debug) Name() string {
 	return "debug"
 }
 
+// show the help message
+func (Debug) Help() string {
+	return "show the words from producer"
+}
+
 // the dummy open method
 func (Debug) Open() (err error) {
 	log.Debug().Msg("dummy open")

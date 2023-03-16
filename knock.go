@@ -1,11 +1,12 @@
 package knock
 
 import (
-	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/alecthomas/kong"
 	"github.com/cmj0121/knock/task/producer"
+	"github.com/cmj0121/knock/task/worker"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -15,9 +16,13 @@ type Knock struct {
 	// the command-line options
 	Debug bool `short:"d" help:"Show the debug message (auto apply --pretty-logger, -vvvv)."`
 
+	// number of workers would be generated and running
+	Workers int    `short:"w" help:"Number of workers [default: runtime.NumCPU()]"`
+	Name    string `arg:"" default:"list" help:"The worker name [default: list]"`
+
 	// the external wordlist
-	File *os.File `xor:"file,ip" short:"f" help:"The external word-list file."`
-	IP   string   `xor:"file,ip" short:"i" help:"The valid IP/mask"`
+	File *os.File `xor:"file,ip" group:"producer" short:"f" help:"The external word-list file."`
+	IP   string   `xor:"file,ip" group:"producer" short:"i" help:"The valid IP/mask"`
 
 	// the logger options
 	Quiet        bool `short:"q" group:"logger" xor:"verbose,quiet" help:"Disable all logger."`
@@ -57,10 +62,16 @@ func (knock *Knock) run() (exitcode int) {
 		}
 	}
 
-	for word := range p.Produce() {
-		fmt.Println(word)
+	worker, ok := worker.GetWorker(knock.Name)
+	if !ok {
+		log.Error().Str("name", knock.Name).Msg("cannot get worker")
+		return 1
 	}
 
+	if err := worker.Run(p.Produce()); err != nil {
+		log.Error().Err(err).Msg("cannot run worker")
+		return 1
+	}
 	return
 }
 
@@ -103,6 +114,10 @@ func (knock *Knock) AfterApply() (err error) {
 
 	if knock.Quiet {
 		knock.Verbose = -1
+	}
+
+	if knock.Workers == 0 {
+		knock.Workers = runtime.NumCPU()
 	}
 
 	return
