@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/cmj0121/knock/task"
 	"github.com/cmj0121/knock/task/producer"
-	"github.com/cmj0121/knock/task/worker"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -64,16 +64,20 @@ func (knock *Knock) run() (exitcode int) {
 		}
 	}
 
-	worker, ok := worker.GetWorker(knock.Name)
-	if !ok {
-		log.Error().Str("name", knock.Name).Msg("cannot get worker")
+	if manager, err := task.New(knock.Name); err != nil {
+		log.Error().Err(err).Str("name", knock.Name)
+		return 1
+	} else if err := manager.NumWorkers(knock.Workers); err != nil {
+		log.Error().Err(err)
+		return 1
+	} else if err := manager.Wait(knock.Wait); err != nil {
+		log.Error().Err(err)
+		return 1
+	} else if err := manager.Run(p); err != nil {
+		log.Error().Err(err)
 		return 1
 	}
 
-	if err := worker.Run(p.Produce(knock.Wait)); err != nil {
-		log.Error().Err(err).Msg("cannot run worker")
-		return 1
-	}
 	return
 }
 
@@ -120,6 +124,10 @@ func (knock *Knock) AfterApply() (err error) {
 
 	if knock.Workers == 0 {
 		knock.Workers = runtime.NumCPU()
+	}
+
+	if knock.Name == "list" {
+		knock.Workers = 1
 	}
 
 	return
