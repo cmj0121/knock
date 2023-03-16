@@ -10,7 +10,7 @@ func ExampleReaderProducer() {
 	reader := strings.NewReader(words)
 
 	producer := NewReaderProducer(reader)
-	for word := range producer.Produce() {
+	for word := range producer.Produce(0) {
 		fmt.Println(word)
 	}
 

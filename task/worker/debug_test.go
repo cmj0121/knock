@@ -11,7 +11,7 @@ func ExampleDebug() {
 	debug.Open()        // nolint
 	defer debug.Close() // nolint
 
-	debug.Run(producer.Produce()) // nolint
+	debug.Run(producer.Produce(0)) // nolint
 	// Output:
 	// 127.0.0.0
 	// 127.0.0.1

@@ -3,6 +3,7 @@ package knock
 import (
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/cmj0121/knock/task/producer"
@@ -21,8 +22,9 @@ type Knock struct {
 	Name    string `arg:"" default:"list" help:"The worker name [default: list]"`
 
 	// the external wordlist
-	File *os.File `xor:"file,ip" group:"producer" short:"f" help:"The external word-list file."`
-	IP   string   `xor:"file,ip" group:"producer" short:"i" help:"The valid IP/mask"`
+	Wait time.Duration `short:"W" help:"The duration per generate word"`
+	File *os.File      `xor:"file,ip" group:"producer" short:"f" help:"The external word-list file."`
+	IP   string        `xor:"file,ip" group:"producer" short:"i" help:"The valid IP/mask"`
 
 	// the logger options
 	Quiet        bool `short:"q" group:"logger" xor:"verbose,quiet" help:"Disable all logger."`
@@ -68,7 +70,7 @@ func (knock *Knock) run() (exitcode int) {
 		return 1
 	}
 
-	if err := worker.Run(p.Produce()); err != nil {
+	if err := worker.Run(p.Produce(knock.Wait)); err != nil {
 		log.Error().Err(err).Msg("cannot run worker")
 		return 1
 	}

@@ -28,7 +28,7 @@ func TestWorker(t *testing.T) {
 				}
 			}()
 
-			if err := worker.Run(producer.Produce()); err != nil {
+			if err := worker.Run(producer.Produce(0)); err != nil {
 				// cannot run the worker
 				t.Errorf("cannot run worker %v: %v", name, err)
 			}

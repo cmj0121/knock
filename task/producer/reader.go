@@ -3,6 +3,7 @@ package producer
 import (
 	"bufio"
 	"io"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -25,7 +26,7 @@ type ReaderProducer struct {
 }
 
 // produce the word list from the current context
-func (ctx *ReaderProducer) Produce() (ch <-chan string) {
+func (ctx *ReaderProducer) Produce(wait time.Duration) (ch <-chan string) {
 	tmp := make(chan string, 1)
 
 	go func() {
@@ -47,6 +48,7 @@ func (ctx *ReaderProducer) Produce() (ch <-chan string) {
 				return
 			}
 
+			time.Sleep(wait)
 		}
 	}()
 

@@ -2,6 +2,7 @@ package producer
 
 import (
 	"net"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -33,7 +34,7 @@ type CIDRProducer struct {
 }
 
 // produce the IP address
-func (ctx *CIDRProducer) Produce() (ch <-chan string) {
+func (ctx *CIDRProducer) Produce(wait time.Duration) (ch <-chan string) {
 	tmp := make(chan string, 1)
 
 	ip_inc := func(ip net.IP) {
@@ -55,6 +56,8 @@ func (ctx *CIDRProducer) Produce() (ch <-chan string) {
 				log.Debug().Msg("explicitly stop the word producer")
 				return
 			}
+
+			time.Sleep(wait)
 		}
 	}()
 

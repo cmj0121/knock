@@ -6,7 +6,7 @@ import (
 
 func ExampleCIDRProducer() {
 	producer, _ := NewCIDRProducer("127.0.0.1/30")
-	for word := range producer.Produce() {
+	for word := range producer.Produce(0) {
 		fmt.Println(word)
 	}
 
