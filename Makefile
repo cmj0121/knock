@@ -32,4 +32,5 @@ help:			# show this message
 		awk 'BEGIN {FS = ":.*?#"} {printf "    %-18s %s\n", $$1, $$2}'
 
 %: %.go $(SRC)
+	go mod tidy -v
 	GOOS=${GOOS} GOARCH=${GOARCH} go build -ldflags="-s -w" -o $@ $<
