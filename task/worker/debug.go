@@ -1,8 +1,7 @@
 package worker
 
 import (
-	"fmt"
-
+	"github.com/cmj0121/knock/progress"
 	"github.com/rs/zerolog/log"
 )
 
@@ -41,7 +40,7 @@ func (Debug) Close() (err error) {
 func (Debug) Run(producer <-chan string) (err error) {
 	for word := range producer {
 		log.Debug().Str("word", word).Msg("handle producer")
-		fmt.Println(word)
+		progress.AddProgress(word)
 	}
 
 	return

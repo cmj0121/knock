@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cmj0121/knock/progress"
 	"github.com/cmj0121/knock/task/producer"
 	"github.com/cmj0121/knock/task/worker"
 	"github.com/rs/zerolog/log"
@@ -68,19 +69,20 @@ func (m *TaskManager) Run(p producer.Producer) (err error) {
 	// create worker and run via goroutine
 	for i := 0; i < m.c; i++ {
 		// create the new worker instance, and run with producer
-		worker := m.w.Dup()
+		w := m.w.Dup()
 
-		if err = worker.Open(); err != nil {
+		if err = w.Open(); err != nil {
 			// cannot allocated worker resource
+			progress.AddError(err)
 			return
 		}
-		defer worker.Close()
+		defer w.Close()
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			if err := worker.Run(producer); err != nil {
+			if err := w.Run(producer); err != nil {
 				log.Error().Err(err).Msg("run worker fail")
 			}
 		}()
