@@ -1,269 +1,136 @@
 package knock
 
 import (
-	"bufio"
-	"fmt"
-	"io"
-	"math/rand"
 	"os"
-	"os/signal"
 	"runtime"
-	"strings"
-	"sync"
-	"syscall"
 	"time"
 
-	"github.com/cmj0121/knock/internal/task"
-	"github.com/cmj0121/stropt"
+	"github.com/alecthomas/kong"
+	"github.com/cmj0121/knock/task"
+	"github.com/cmj0121/knock/task/producer"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-// the knock instance, generate the word list, pass to the task and then
-// get the response.
+// the knock instance to run the brute-force task
 type Knock struct {
-	stropt.Model
+	// the command-line options
+	Debug bool `short:"d" help:"Show the debug message (auto apply --pretty-logger, -vvvv)."`
 
-	// number milliseconds to wait per each task
-	Wait time.Duration `shortcut:"w" desc:"number of milliseconds to wait per each task"`
-	// number of the Worker
-	Worker int `shortcut:"W" desc:"number of worker"`
-	// set the progress message disable
-	Silence bool `shortcut:"s" desc:"do not show the progress message"`
+	// number of workers would be generated and running
+	Workers int      `short:"w" help:"Number of workers [default: runtime.NumCPU()]"`
+	Name    string   `required:"" arg:"" default:"list" help:"The worker name [default: list]"`
+	Args    []string `optional:"" arg:"" help:"the extra arguments to the worker"`
 
-	Token *string `shortcut:"t" attr:"flag" desc:"test on the specified token"`
+	// the external wordlist
+	Wait time.Duration `default:"25ms" short:"W" help:"The duration per generate word"`
+	File *os.File      `xor:"file,ip" group:"producer" short:"f" help:"The external word-list file."`
+	IP   string        `xor:"file,ip" group:"producer" short:"i" help:"The valid IP/mask"`
 
-	*os.File `shortcut:"f" attr:"flag" desc:"external word-list file"`
-
-	// the pre-defined task
-	*task.Debug `desc:"show the tokens only (default action)"`
-	*task.DNS   `desc:"try to find all possible DNS record"`
-	*task.Web   `desc:"try to find all possible web path"`
-	*task.Find  `desc:"try to find the host by given token"`
-
-	// the shared channel to notify workers closed
-	closed chan struct{}
-	// the shared channel to notify main thread about all workers closed
-	finished chan struct{}
-	// the shared channel to collect the result from tasks
-	ch_collector chan task.Message
+	// the logger options
+	Quiet        bool `short:"q" group:"logger" xor:"verbose,quiet" help:"Disable all logger."`
+	Verbose      int  `short:"v" group:"logger" xor:"verbose,quiet" type:"counter" help:"Show the verbose logger."`
+	PrettyLogger bool `group:"logger" help:"Show the pretty logger."`
 }
 
+// create the Knock instance with the default settings.
 func New() (knock *Knock) {
-	knock = &Knock{
-		Wait:   50 * time.Millisecond,
-		Worker: runtime.NumCPU(),
-
-		Debug: &task.Debug{},
-
-		closed:       make(chan struct{}, 1),
-		finished:     make(chan struct{}, 1),
-		ch_collector: make(chan task.Message, 1),
-	}
+	knock = &Knock{}
 	return
 }
 
-// run the knock with provides arguments
-func (knock *Knock) Run() (err error) {
-	parser := stropt.MustNew(knock)
-	parser.Version(Version())
-	parser.Run()
+// run the knock, parse by the passed arguments from CLI and return
+// the result.
+func (knock *Knock) Run() int {
+	kong.Parse(knock)
 
-	if knock.Wait == 0 {
-		// set silence when wait=0
-		knock.Silence = true
-	}
+	knock.prologue()
+	return knock.run()
+}
 
-	var runner task.Task
-	switch {
-	case knock.DNS != nil:
-		runner = knock.DNS
-	case knock.Web != nil:
-		runner = knock.Web
-	case knock.Find != nil:
-		runner = knock.Find
+func (knock *Knock) run() (exitcode int) {
+	log.Info().Msg("start Knock ...")
+
+	var p producer.Producer
+
+	switch knock.IP {
+	case "":
+		p = producer.NewReaderProducer(knock.File)
 	default:
-		runner = knock.Debug
+		var err error
+
+		if p, err = producer.NewCIDRProducer(knock.IP); err != nil {
+			log.Error().Err(err).Msg("invalid IP")
+			return 1
+		}
 	}
 
-	wg := sync.WaitGroup{}
-	ctx := task.Context{
-		Closed:    knock.closed,
-		Wait:      knock.Wait,
-		Collector: knock.ch_collector,
+	if manager, err := task.New(knock.Name); err != nil {
+		log.Error().Err(err).Str("name", knock.Name)
+		return 1
+	} else if err := manager.NumWorkers(knock.Workers); err != nil {
+		log.Error().Err(err)
+		return 1
+	} else if err := manager.Wait(knock.Wait); err != nil {
+		log.Error().Err(err)
+		return 1
+	} else if err := manager.Run(p, knock.Args...); err != nil {
+		log.Error().Err(err)
+		return 1
 	}
 
-	// run the reducer to receive message
-	go knock.reducer()
-
-	var mode task.TaskMode
-	if mode, err = runner.Prologue(&ctx); err != nil {
-		err = fmt.Errorf("%v prologue: %v", runner.Name(), err)
-		return
-	}
-
-	ctx.Producer = knock.run_producer(&ctx, mode)
-
-	// start all the worker
-	for idx := 0; idx < knock.Worker; idx++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			if err := runner.Execute(&ctx); err != nil {
-				// catch error, show the message
-				knock.ch_collector <- task.Message{
-					Status: task.ERROR,
-					Msg:    fmt.Sprintf("execute task %#v: %v", runner.Name(), err),
-				}
-			}
-		}()
-	}
-
-	// wait all task finished, and notify main thread
-	go func() {
-		wg.Wait()
-		runner.Epilogue(&ctx)
-		close(knock.finished)
-	}()
-
-	// exactly run the knock, wait finished or catch Ctrl-C
-	knock.run()
+	log.Info().Msg("finish knock ...")
 	return
 }
 
-// run the knock main thread and want tasks finished or force stop
-// via Ctrl-C
-func (knock *Knock) run() {
-	sigint := make(chan os.Signal, 1)
-	done := make(chan struct{}, 1)
-	signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM)
-
-	// another go-routine for wait SIGNINT
-	go func() {
-		// wait signal or knock closed
-		select {
-		case <-knock.closed:
-			// main thread closed
-		case <-sigint:
-			// catch Ctrl-C
-		}
-
-		// notify knock should be closed
-		close(done)
-	}()
-
-	// wait either timeout or catch Ctrl-C
-	select {
-	case <-knock.finished:
-		// all tasks finished
-	case <-done:
-		// catch Ctrl-C
-	}
-
-	knock.gradeful_shutdown()
+// setup the necessary before run knock
+func (knock *Knock) prologue() {
+	knock.setupLogger()
 }
 
-func (knock *Knock) run_producer(ctx *task.Context, mode task.TaskMode) (producer <-chan string) {
-	switch {
-	case knock.Token != nil:
-		producer = knock.producer(strings.NewReader(*knock.Token))
-	case ctx.Producer != nil:
-		// already create the producer
-		producer = ctx.Producer
-	case mode&task.M_NO_PRODUCER != 0:
-		producer = knock.producer(strings.NewReader("."))
-	case knock.File == nil:
-		producer = knock.producer(strings.NewReader(word_lists))
+// setup the logger sub-system
+func (knock *Knock) setupLogger() {
+	if knock.PrettyLogger {
+		writter := zerolog.ConsoleWriter{Out: os.Stderr}
+		log.Logger = zerolog.New(writter).With().Timestamp().Logger()
+	}
+
+	switch knock.Verbose {
+	case -1:
+		zerolog.SetGlobalLevel(zerolog.Disabled)
+	case 0:
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+	case 1:
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	case 2:
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	case 3:
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	default:
-		producer = knock.producer(knock.File)
+		zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	}
+
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+}
+
+// the callback function after kong parse the CLI arguments
+func (knock *Knock) AfterApply() (err error) {
+	if knock.Debug {
+		knock.PrettyLogger = true
+		knock.Verbose = 4
+	}
+
+	if knock.Quiet {
+		knock.Verbose = -1
+	}
+
+	if knock.Workers == 0 {
+		knock.Workers = runtime.NumCPU()
+	}
+
+	if knock.Name == "list" {
+		knock.Workers = 1
 	}
 
 	return
-}
-
-// generate the tokens to the tasks
-func (knock *Knock) producer(r io.Reader) (p <-chan string) {
-	ch := make(chan string, 1)
-
-	go func() {
-		defer close(ch)
-
-		scanner := bufio.NewScanner(r)
-		token_buff := []string{}
-
-		for scanner.Scan() {
-			token := scanner.Text()
-			token_buff = append(token_buff, token)
-		}
-
-		rand.Seed(int64(time.Now().Nanosecond()))
-		rand.Shuffle(len(token_buff), func(i, j int) {
-			token_buff[i], token_buff[j] = token_buff[j], token_buff[i]
-		})
-
-		for idx := range token_buff {
-			select {
-			case <-knock.closed:
-				return
-			case ch <- token_buff[idx]:
-			}
-
-			time.Sleep(knock.Wait)
-		}
-	}()
-
-	p = ch
-	return
-}
-
-// show the message
-func (knock *Knock) reducer() {
-	progress := 0
-	progress_bar := []string{"|", "/", "-", "\\"}
-	show_progress := false
-
-	defer func() {
-		if show_progress {
-			fmt.Printf("\x1b[s\x1b[2K\x1b[u")
-		}
-	}()
-
-	for {
-		select {
-		case <-knock.closed:
-			return
-		case message := <-knock.ch_collector:
-			show_progress = false
-
-			switch message.Status {
-			case task.RESULT:
-				fmt.Printf("[%v] ........................ %v\n", "+", message.Msg)
-			case task.ERROR:
-				fmt.Printf("[%v] ........................ %v\n", "!", message.Msg)
-			case task.TRACE:
-				// 2K clear entire line and cursor position does not change
-				//  s saves the cursor position/state in SCO console mode
-				//  u restores the cursor position/state in SCO console mode
-				if !knock.Silence {
-					fmt.Printf("\x1b[s\x1b[2K[%v] ........................ %v\x1b[u", progress_bar[progress], message.Msg)
-					progress = (progress + 1) % len(progress_bar)
-				}
-				show_progress = true
-			default:
-				fmt.Printf("[%v] ........................ %v\n", "?", message.Msg)
-			}
-		}
-	}
-}
-
-// the post-script for the Knock.
-func (knock *Knock) gradeful_shutdown() {
-	// notify reducer and all worker stop
-	close(knock.closed)
-	// wait 1 seconds
-	time.Sleep(time.Second)
-	// the final stesp need to execute after Knock stop
-	close(knock.ch_collector)
-	// exit program
-	fmt.Println("\n~ Bye ~")
-	os.Exit(0)
 }
