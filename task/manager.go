@@ -65,18 +65,18 @@ func (m *TaskManager) Run(p producer.Producer, args ...string) (err error) {
 	producer := p.Produce(m.t)
 	defer p.Close()
 
+	if err = m.w.Open(args...); err != nil {
+		// cannot allocated worker resource
+		progress.AddError(err)
+		return
+	}
+	defer m.w.Close()
+
 	var wg sync.WaitGroup
 	// create worker and run via goroutine
 	for i := 0; i < m.c; i++ {
 		// create the new worker instance, and run with producer
 		w := m.w.Dup()
-
-		if err = w.Open(args...); err != nil {
-			// cannot allocated worker resource
-			progress.AddError(err)
-			return
-		}
-		defer w.Close()
 
 		wg.Add(1)
 		go func() {
