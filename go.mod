@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/alecthomas/kong v0.7.1
 	github.com/rs/zerolog v1.29.0
+	golang.org/x/crypto v0.7.0
 )
 
 require (
