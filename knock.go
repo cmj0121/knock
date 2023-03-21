@@ -22,7 +22,7 @@ type Knock struct {
 	Name    string `arg:"" default:"list" help:"The worker name [default: list]"`
 
 	// the external wordlist
-	Wait time.Duration `short:"W" help:"The duration per generate word"`
+	Wait time.Duration `default:"25ms" short:"W" help:"The duration per generate word"`
 	File *os.File      `xor:"file,ip" group:"producer" short:"f" help:"The external word-list file."`
 	IP   string        `xor:"file,ip" group:"producer" short:"i" help:"The valid IP/mask"`
 
