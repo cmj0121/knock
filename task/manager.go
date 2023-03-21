@@ -61,7 +61,7 @@ func (m *TaskManager) Wait(t time.Duration) (err error) {
 }
 
 // execute the task by the passed producer
-func (m *TaskManager) Run(p producer.Producer) (err error) {
+func (m *TaskManager) Run(p producer.Producer, args ...string) (err error) {
 	producer := p.Produce(m.t)
 	defer p.Close()
 
@@ -71,7 +71,7 @@ func (m *TaskManager) Run(p producer.Producer) (err error) {
 		// create the new worker instance, and run with producer
 		w := m.w.Dup()
 
-		if err = w.Open(); err != nil {
+		if err = w.Open(args...); err != nil {
 			// cannot allocated worker resource
 			progress.AddError(err)
 			return

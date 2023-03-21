@@ -30,10 +30,10 @@ func (p *Progress) AddProgress(msg string, args ...interface{}) {
 
 // add text result
 func (p *Progress) AddText(msg string, args ...interface{}) {
-	fmt.Fprintf(p.Writer, "[+] %v\n", fmt.Sprintf(msg, args...))
+	fmt.Fprintf(p.Writer, "\x1b[2K[+] %v\n", fmt.Sprintf(msg, args...))
 }
 
 // add an error message
 func (p *Progress) AddError(err error) {
-	fmt.Fprintf(p.Writer, "[!] %v\n", err)
+	fmt.Fprintf(p.Writer, "\x1b[2K[!] %v\n", err)
 }

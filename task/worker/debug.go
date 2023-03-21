@@ -25,7 +25,7 @@ func (Debug) Help() string {
 }
 
 // the dummy open method
-func (Debug) Open() (err error) {
+func (Debug) Open(args ...string) (err error) {
 	log.Debug().Msg("dummy open")
 	return
 }

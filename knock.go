@@ -18,8 +18,9 @@ type Knock struct {
 	Debug bool `short:"d" help:"Show the debug message (auto apply --pretty-logger, -vvvv)."`
 
 	// number of workers would be generated and running
-	Workers int    `short:"w" help:"Number of workers [default: runtime.NumCPU()]"`
-	Name    string `arg:"" default:"list" help:"The worker name [default: list]"`
+	Workers int      `short:"w" help:"Number of workers [default: runtime.NumCPU()]"`
+	Name    string   `required:"" arg:"" default:"list" help:"The worker name [default: list]"`
+	Args    []string `optional:"" arg:"" help:"the extra arguments to the worker"`
 
 	// the external wordlist
 	Wait time.Duration `default:"25ms" short:"W" help:"The duration per generate word"`
@@ -73,7 +74,7 @@ func (knock *Knock) run() (exitcode int) {
 	} else if err := manager.Wait(knock.Wait); err != nil {
 		log.Error().Err(err)
 		return 1
-	} else if err := manager.Run(p); err != nil {
+	} else if err := manager.Run(p, knock.Args...); err != nil {
 		log.Error().Err(err)
 		return 1
 	}

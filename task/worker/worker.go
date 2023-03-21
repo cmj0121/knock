@@ -14,7 +14,7 @@ type Worker interface {
 	Help() string
 
 	// open with necessary resources
-	Open() error
+	Open(args ...string) error
 
 	// close the allocated resources
 	Close() error

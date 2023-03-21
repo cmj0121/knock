@@ -26,7 +26,7 @@ func (ListTasks) Help() string {
 }
 
 // the dummy open method
-func (ListTasks) Open() (err error) {
+func (ListTasks) Open(args ...string) (err error) {
 	log.Debug().Msg("dummy open")
 	return
 }
