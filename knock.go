@@ -14,13 +14,16 @@ import (
 
 // the knock instance to run the brute-force task
 type Knock struct {
+	// show version and exit
+	Version VersionFlag `short:"V" name:"version" help:"Print version info and quit"`
+
 	// the command-line options
 	Debug bool `short:"d" help:"Show the debug message (auto apply --pretty-logger, -vvvv)."`
 
 	// number of workers would be generated and running
 	Workers int      `short:"w" help:"Number of workers [default: runtime.NumCPU()]"`
 	Name    string   `required:"" arg:"" default:"list" help:"The worker name [default: list]"`
-	Args    []string `optional:"" arg:"" help:"the extra arguments to the worker"`
+	Args    []string `optional:"" arg:"" help:"The extra arguments to the worker"`
 
 	// the external wordlist
 	Wait time.Duration `default:"25ms" short:"W" help:"The duration per generate word"`

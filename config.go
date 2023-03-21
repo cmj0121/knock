@@ -2,6 +2,8 @@ package knock
 
 import (
 	"fmt"
+
+	"github.com/alecthomas/kong"
 )
 
 // the meta of this projecet
@@ -19,4 +21,12 @@ const (
 func Version() (ver string) {
 	ver = fmt.Sprintf("%s (v%d.%d.%d)", PROJ_NAME, MACRO, MINOR, MACRO)
 	return
+}
+
+type VersionFlag bool
+
+func (v VersionFlag) BeforeApply(app *kong.Kong, vars kong.Vars) error {
+	fmt.Println(Version())
+	app.Exit(0)
+	return nil
 }
