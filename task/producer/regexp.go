@@ -30,16 +30,16 @@ type RegexpProducer struct {
 	Closed chan struct{}
 }
 
-// produce the token via the regexp pattern
+// produce the word via the regexp pattern
 func (ctx *RegexpProducer) Produce(wait time.Duration) (ch <-chan string) {
 	tmp := make(chan string, 1)
 
 	go func() {
 		defer close(tmp)
 
-		for token := range NewState(ctx.Regexp).Next() {
+		for word := range NewState(ctx.Regexp).Next() {
 			select {
-			case tmp <- token:
+			case tmp <- word:
 			case <-ctx.Closed:
 				log.Debug().Msg("explicitly stop the word producer")
 				return
@@ -69,7 +69,7 @@ func NewState(re *syntax.Regexp) *State {
 	}
 }
 
-// generate the possible token list
+// generate the possible word list
 func (s *State) Next() (ch <-chan string) {
 	ch = s.next(s.Regexp)
 	return
@@ -114,10 +114,40 @@ func (s *State) next(re *syntax.Regexp, others ...*syntax.Regexp) (ch chan strin
 					ch <- word + next
 				}
 			}
+		case syntax.OpRepeat:
+			// matches Sub[0] at least Min times, at most Max (Max == -1 is no limit)
+			for repeat := re.Min; repeat <= re.Max; repeat++ {
+				for word := range s.repeat(repeat, re.Sub[0], re.Sub[1:]...) {
+					ch <- word
+				}
+			}
 		default:
 			log.Error().Str("Op", re.Op.String()).Interface("re", re).Msg("not implemented")
 		}
 	}()
 
 	return
+}
+
+func (s *State) repeat(count int, re *syntax.Regexp, others ...*syntax.Regexp) (ch chan string) {
+	ch = make(chan string, 1)
+	go func() {
+		defer close(ch)
+
+		switch count {
+		case 0:
+			return
+		case 1:
+			for word := range s.next(re, others...) {
+				ch <- word
+			}
+		default:
+			for word := range s.next(re, others...) {
+				for next := range s.repeat(count-1, re, others...) {
+					ch <- word + next
+				}
+			}
+		}
+	}()
+	return ch
 }
