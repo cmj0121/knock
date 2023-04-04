@@ -71,29 +71,53 @@ func NewState(re *syntax.Regexp) *State {
 
 // generate the possible token list
 func (s *State) Next() (ch <-chan string) {
-	tmp := make(chan string, 1)
+	ch = s.next(s.Regexp)
+	return
+}
+
+func (s *State) next(re *syntax.Regexp, others ...*syntax.Regexp) (ch chan string) {
+	ch = make(chan string, 1)
 
 	go func() {
-		defer close(tmp)
+		defer close(ch)
 
-		switch s.Regexp.Op {
+		switch re.Op {
 		case syntax.OpEmptyMatch:
 			// matches empty string
 		case syntax.OpLiteral:
-			tmp <- string(s.Regexp.Rune)
+			switch len(others) {
+			case 0:
+				ch <- string(re.Rune)
+			default:
+				for next := range s.next(others[0], others[1:]...) {
+					ch <- string(re.Rune) + next
+				}
+			}
 		case syntax.OpCharClass:
 			// matches Runes interpreted as range pair list
-			for idx := 0; idx < len(s.Regexp.Rune); idx += 2 {
-				for ch := s.Regexp.Rune[idx]; ch <= s.Regexp.Rune[idx+1]; ch++ {
-					tmp <- string(ch)
+			for idx := 0; idx < len(re.Rune); idx += 2 {
+				for word := re.Rune[idx]; word <= re.Rune[idx+1]; word++ {
+					switch len(others) {
+					case 0:
+						ch <- string(word)
+					default:
+						for next := range s.next(others[0], others[1:]...) {
+							ch <- string(word) + next
+						}
+					}
+				}
+			}
+		case syntax.OpConcat:
+			// matches concatenation of Subs
+			for word := range s.next(re.Sub[0]) {
+				for next := range s.next(re.Sub[1], re.Sub[2:]...) {
+					ch <- word + next
 				}
 			}
 		default:
-			log.Error().Str("Op", s.Regexp.Op.String()).Interface("re", s.Regexp).Msg("not implemented")
-			return
+			log.Error().Str("Op", re.Op.String()).Interface("re", re).Msg("not implemented")
 		}
 	}()
 
-	ch = tmp
 	return
 }
