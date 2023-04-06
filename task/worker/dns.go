@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/cmj0121/knock/progress"
 	"github.com/rs/zerolog/log"
@@ -97,8 +98,6 @@ func (d *DNS) Run(producer <-chan string) (err error) {
 }
 
 func (d *DNS) run(hostname string) {
-	d.lookupIPv4(hostname)
-	d.lookupIPv6(hostname)
 	d.lookupCNAME(hostname)
 	d.lookupMX(hostname)
 	d.lookupNS(hostname)
@@ -117,43 +116,64 @@ func (d *DNS) Dup() (worker Worker) {
 func (d *DNS) lookupIPv4(hostname string) {
 	resp, err := d.LookupIP(context.Background(), "ip4", hostname)
 	if err == nil && len(resp) > 0 {
+		ips := []string{}
 		for _, ip := range resp {
-			d.addProgress("A", hostname, ip)
+			ips = append(ips, ip.String())
 		}
+		d.addProgress("A", hostname, strings.Join(ips, " "))
 	}
 }
 
 func (d *DNS) lookupIPv6(hostname string) {
 	resp, err := d.LookupIP(context.Background(), "ip6", hostname)
 	if err == nil && len(resp) > 0 {
+		ips := []string{}
 		for _, ip := range resp {
-			d.addProgress("AAAA", hostname, ip)
+			ips = append(ips, ip.String())
 		}
+		d.addProgress("AAAA", hostname, strings.Join(ips, " "))
 	}
 }
 
 func (d *DNS) lookupCNAME(hostname string) {
+	found := false
+
 	resp, err := d.LookupCNAME(context.Background(), hostname)
 	if err == nil && len(resp) > 0 {
-		d.addProgress("CNAME", hostname, resp)
+		switch resp {
+		case hostname:
+		case fmt.Sprintf("%v.", hostname):
+		default:
+			d.addProgress("CNAME", hostname, resp)
+			found = true
+		}
+	}
+
+	if !found {
+		d.lookupIPv4(hostname)
+		d.lookupIPv6(hostname)
 	}
 }
 
 func (d *DNS) lookupMX(hostname string) {
 	resp, err := d.LookupMX(context.Background(), hostname)
 	if err == nil && len(resp) > 0 {
+		mxs := []string{}
 		for _, mx := range resp {
-			d.addProgress("MX", hostname, mx.Host)
+			mxs = append(mxs, mx.Host)
 		}
+		d.addProgress("MX", hostname, strings.Join(mxs, " "))
 	}
 }
 
 func (d *DNS) lookupNS(hostname string) {
 	resp, err := d.LookupNS(context.Background(), hostname)
 	if err == nil && len(resp) > 0 {
+		nss := []string{}
 		for _, ns := range resp {
-			d.addProgress("NS", hostname, ns.Host)
+			nss = append(nss, ns.Host)
 		}
+		d.addProgress("NS", hostname, strings.Join(nss, " "))
 	}
 }
 
