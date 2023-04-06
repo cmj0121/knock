@@ -161,6 +161,10 @@ func (d *DNS) lookupTXT(hostname string) {
 	resp, err := d.LookupTXT(context.Background(), hostname)
 	if err == nil && len(resp) > 0 {
 		for _, txt := range resp {
+			if txt == "v=spf1 -all" {
+				// skip the dummy TXT record
+				continue
+			}
 			d.addProgress("TXT", hostname, txt)
 		}
 	}
