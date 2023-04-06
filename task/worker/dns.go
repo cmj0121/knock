@@ -198,5 +198,5 @@ func (d *DNS) addProgress(qtype, hostname string, resp interface{}) {
 		}
 	}
 
-	progress.AddText("%-6v %-18v %v", qtype, hostname, resp)
+	progress.AddText("%-6v %-28v %v", qtype, hostname, resp)
 }
