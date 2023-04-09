@@ -13,7 +13,7 @@ const (
 
 	// project version
 	MAJOR = 0 // the API version, bump when change interface
-	MINOR = 3 // bump when the new feature implemented
+	MINOR = 4 // bump when the new feature implemented
 	MACRO = 0 // bump when bug-fixed only
 )
 
