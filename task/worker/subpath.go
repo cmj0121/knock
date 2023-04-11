@@ -70,19 +70,10 @@ func (s *SubPath) Run(producer <-chan string) (err error) {
 		progress.AddProgress(word)
 
 		url := fmt.Sprintf("%v/%v", s.hostname, word)
-		switch resp, err := s.Client.Get(url); err {
-		case nil:
-			switch resp.StatusCode {
-			case 404:
-			default:
-				size, _ := io.Copy(io.Discard, resp.Body)
-				resp.Body.Close()
-
-				progress.AddText("%v %v (%v)", resp.StatusCode, url, size)
-			}
-		default:
-			progress.AddError(err)
-		}
+		s.check(url, http.MethodGet)
+		s.check(url, http.MethodPost)
+		s.check(url, http.MethodPut)
+		s.check(url, http.MethodDelete)
 	}
 	return
 }
@@ -93,5 +84,31 @@ func (s *SubPath) Dup() (worker Worker) {
 		Client:   s.Client,
 		hostname: s.hostname,
 	}
+	return
+}
+
+// check the folder with multiple possible HTTP method
+func (s *SubPath) check(url, method string) (code int) {
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		progress.AddError(err)
+		return
+	}
+
+	switch resp, err := s.Client.Do(req); err {
+	case nil:
+		switch code = resp.StatusCode; code {
+		case 404:
+		case 405:
+		default:
+			size, _ := io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+
+			progress.AddText("%-6v %v %v (%v)", method, resp.StatusCode, url, size)
+		}
+	default:
+		progress.AddError(err)
+	}
+
 	return
 }
