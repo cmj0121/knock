@@ -3,12 +3,20 @@ package producer
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 )
 
 func ExampleRegexpProducer() {
 	producer, _ := NewRegexpProducer(`\d`)
+
+	word_list := []string{}
 	for word := range producer.Produce(0) {
+		word_list = append(word_list, word)
+	}
+
+	sort.Strings(word_list)
+	for _, word := range word_list {
 		fmt.Println(word)
 	}
 
@@ -52,7 +60,7 @@ func TestRegexpProducer(t *testing.T) {
 		},
 		{
 			Pattern: `[ab]{2,3}`,
-			Tokens:  []string{"aa", "ab", "ba", "bb", "aaa", "aab", "aba", "abb", "baa", "bab", "bba", "bbb"},
+			Tokens:  []string{"aa", "aaa", "aab", "ab", "aba", "abb", "ba", "baa", "bab", "bb", "bba", "bbb"},
 		},
 	}
 
@@ -74,6 +82,7 @@ func testRegexpProducer(pattern string, tokens []string) func(*testing.T) {
 			ret = append(ret, token)
 		}
 
+		sort.Strings(ret)
 		if !reflect.DeepEqual(ret, tokens) {
 			t.Errorf("expected %#v got %v: %v", pattern, tokens, ret)
 		}

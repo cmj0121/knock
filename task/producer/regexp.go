@@ -2,6 +2,7 @@ package producer
 
 import (
 	"fmt"
+	"math/rand"
 	"regexp/syntax"
 	"time"
 
@@ -105,7 +106,12 @@ func (s *State) next(re *syntax.Regexp, others ...*syntax.Regexp) (ch chan strin
 		case syntax.OpCharClass:
 			// matches Runes interpreted as range pair list
 			for idx := 0; idx < len(re.Rune); idx += 2 {
-				for word := re.Rune[idx]; word <= re.Rune[idx+1]; word++ {
+				word_list := s.rune_range(re.Rune[idx], re.Rune[idx+1])
+				rand.Shuffle(len(word_list), func(i, j int) {
+					word_list[i], word_list[j] = word_list[j], word_list[i]
+				})
+
+				for _, word := range word_list {
 					switch len(others) {
 					case 0:
 						ch <- string(word)
@@ -159,4 +165,11 @@ func (s *State) repeat(count int, re *syntax.Regexp, others ...*syntax.Regexp) (
 		}
 	}()
 	return ch
+}
+
+func (State) rune_range(min, max rune) (ret []rune) {
+	for r := min; r <= max; r++ {
+		ret = append(ret, r)
+	}
+	return
 }
