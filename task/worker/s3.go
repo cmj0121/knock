@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/cmj0121/knock/progress"
 	"github.com/rs/zerolog/log"
@@ -71,6 +73,11 @@ func (s *S3) Run(producer <-chan string) (err error) {
 		log.Debug().Str("word", word).Msg("handle producer")
 		progress.AddProgress(word)
 
+		word = strings.ToLower(word)
+		if !s.validator(word) {
+			continue
+		}
+
 		url := fmt.Sprintf("https://%v.s3.amazonaws.com", word)
 		switch resp, err := s.Client.Get(url); err {
 		case nil:
@@ -98,5 +105,29 @@ func (s *S3) Dup() (worker Worker) {
 		Client: s.Client,
 		prefix: s.prefix,
 	}
+	return
+}
+
+// validate the S3 bucket name
+// ref: https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
+func (S3) validator(bucket string) (valid bool) {
+	if matched, _ := regexp.MatchString(`[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]`, bucket); matched {
+		log.Info().Str("bucket", bucket).Msg("not valid bucket bucket")
+		return
+	}
+
+	switch {
+	case strings.HasPrefix(bucket, `xn--`):
+		log.Info().Str("bucket", bucket).Msg("not valid bucket bucket")
+		return
+	case strings.HasSuffix(bucket, `-s3alias`):
+		log.Info().Str("bucket", bucket).Msg("not valid bucket bucket")
+		return
+	case strings.HasSuffix(bucket, `--ol-s3`):
+		log.Info().Str("bucket", bucket).Msg("not valid bucket bucket")
+		return
+	}
+
+	valid = true
 	return
 }
