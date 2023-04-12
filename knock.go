@@ -26,9 +26,10 @@ type Knock struct {
 	Args    []string `optional:"" arg:"" help:"The extra arguments to the worker"`
 
 	// the external wordlist
-	Wait time.Duration `default:"25ms" short:"W" help:"The duration per generate word"`
-	File *os.File      `xor:"file,ip" group:"producer" short:"f" help:"The external word-list file."`
-	IP   string        `xor:"file,ip" group:"producer" short:"i" help:"The valid IP/mask"`
+	Wait   time.Duration `default:"25ms" short:"W" help:"The duration per generate word"`
+	File   *os.File      `xor:"file,ip,regexp" group:"producer" short:"f" help:"The external word-list file."`
+	IP     string        `xor:"file,ip,regexp" group:"producer" short:"i" help:"The valid IP/mask"`
+	Regexp string        `xor:"file,ip,regexp" group:"producer" short:"r" help:"The regexp pattern"`
 
 	// the logger options
 	Quiet        bool `short:"q" group:"logger" xor:"verbose,quiet" help:"Disable all logger."`
@@ -56,9 +57,16 @@ func (knock *Knock) run() (exitcode int) {
 
 	var p producer.Producer
 
-	switch knock.IP {
-	case "":
+	switch {
+	case knock.File != nil:
 		p = producer.NewReaderProducer(knock.File)
+	case knock.Regexp != "":
+		var err error
+
+		if p, err = producer.NewRegexpProducer(knock.Regexp); err != nil {
+			log.Error().Err(err).Msg("invalid regexp")
+			return 1
+		}
 	default:
 		var err error
 
