@@ -26,6 +26,8 @@ func NewCIDRProducer(s string) (producer *CIDRProducer, err error) {
 
 // the IP address producer by the IP/mask
 type CIDRProducer struct {
+	ProducerBase
+
 	// the target IP/mask
 	*net.IPNet
 
@@ -68,10 +70,6 @@ func (ctx *CIDRProducer) Produce(wait time.Duration) (ch <-chan string) {
 
 	ch = tmp
 	return
-}
-
-func (ctx *CIDRProducer) Prefix(prefix string) {
-	ctx.prefix = prefix
 }
 
 // explicitly close the current producer

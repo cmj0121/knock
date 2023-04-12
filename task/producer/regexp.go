@@ -24,11 +24,10 @@ func NewRegexpProducer(s string) (producer *RegexpProducer, err error) {
 
 // the Regexp-based random string generator
 type RegexpProducer struct {
+	ProducerBase
+
 	// the compiled regular-expression syntax
 	*syntax.Regexp
-
-	// the prefix
-	prefix string
 
 	// the signle for close the current connection and the subscriber
 	// should close all allocated resources.
@@ -57,10 +56,6 @@ func (ctx *RegexpProducer) Produce(wait time.Duration) (ch <-chan string) {
 
 	ch = tmp
 	return
-}
-
-func (ctx *RegexpProducer) Prefix(prefix string) {
-	ctx.prefix = prefix
 }
 
 // explicitly close the current producer

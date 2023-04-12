@@ -18,11 +18,10 @@ func NewReaderProducer(r io.Reader) *ReaderProducer {
 
 // the word producer by the known io.Reader, separate by the newline
 type ReaderProducer struct {
+	ProducerBase
+
 	// the data reader
 	io.Reader
-
-	// the prefix
-	prefix string
 
 	// the signle for close the current connection and the subscriber
 	// should close all allocated resources.
@@ -59,10 +58,6 @@ func (ctx *ReaderProducer) Produce(wait time.Duration) (ch <-chan string) {
 
 	ch = tmp
 	return
-}
-
-func (ctx *ReaderProducer) Prefix(prefix string) {
-	ctx.prefix = prefix
 }
 
 // explicitly close the current producer
