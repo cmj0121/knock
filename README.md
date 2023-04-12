@@ -25,7 +25,9 @@ go install github.com/cmj0121/knock
 You can execute **knock** and list all available sub-modules. Each module provides
 a method for you to **brute-force** some information by your word generator.
 
-### Support Modules
+### Support Worker
+The Worker is the interface to serve the incoming words and execute some purpose task.
+It can run task by the passed word and show the result.
 
 | name  | description                            | optional argument  |
 |-------|----------------------------------------|--------------------|
