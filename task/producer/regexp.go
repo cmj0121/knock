@@ -1,6 +1,7 @@
 package producer
 
 import (
+	"fmt"
 	"regexp/syntax"
 	"time"
 
@@ -25,6 +26,9 @@ type RegexpProducer struct {
 	// the compiled regular-expression syntax
 	*syntax.Regexp
 
+	// the prefix
+	prefix string
+
 	// the signle for close the current connection and the subscriber
 	// should close all allocated resources.
 	Closed chan struct{}
@@ -38,8 +42,9 @@ func (ctx *RegexpProducer) Produce(wait time.Duration) (ch <-chan string) {
 		defer close(tmp)
 
 		for word := range NewState(ctx.Regexp).Next() {
+			text := fmt.Sprintf("%v%v", ctx.prefix, word)
 			select {
-			case tmp <- word:
+			case tmp <- text:
 			case <-ctx.Closed:
 				log.Debug().Msg("explicitly stop the word producer")
 				return
@@ -51,6 +56,10 @@ func (ctx *RegexpProducer) Produce(wait time.Duration) (ch <-chan string) {
 
 	ch = tmp
 	return
+}
+
+func (ctx *RegexpProducer) Prefix(prefix string) {
+	ctx.prefix = prefix
 }
 
 // explicitly close the current producer

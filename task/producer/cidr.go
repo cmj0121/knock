@@ -1,6 +1,7 @@
 package producer
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -28,6 +29,9 @@ type CIDRProducer struct {
 	// the target IP/mask
 	*net.IPNet
 
+	// the prefix
+	prefix string
+
 	// the signle for close the current connection and the subscriber
 	// should close all allocated resources.
 	Closed chan struct{}
@@ -50,8 +54,9 @@ func (ctx *CIDRProducer) Produce(wait time.Duration) (ch <-chan string) {
 		defer close(tmp)
 
 		for ip := ctx.IP.Mask(ctx.Mask); ctx.Contains(ip); ip_inc(ip) {
+			ip := fmt.Sprintf("%v%v", ctx.prefix, ip)
 			select {
-			case tmp <- ip.String():
+			case tmp <- ip:
 			case <-ctx.Closed:
 				log.Debug().Msg("explicitly stop the word producer")
 				return
@@ -63,6 +68,10 @@ func (ctx *CIDRProducer) Produce(wait time.Duration) (ch <-chan string) {
 
 	ch = tmp
 	return
+}
+
+func (ctx *CIDRProducer) Prefix(prefix string) {
+	ctx.prefix = prefix
 }
 
 // explicitly close the current producer

@@ -2,6 +2,7 @@ package producer
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"time"
 
@@ -19,6 +20,9 @@ func NewReaderProducer(r io.Reader) *ReaderProducer {
 type ReaderProducer struct {
 	// the data reader
 	io.Reader
+
+	// the prefix
+	prefix string
 
 	// the signle for close the current connection and the subscriber
 	// should close all allocated resources.
@@ -41,8 +45,9 @@ func (ctx *ReaderProducer) Produce(wait time.Duration) (ch <-chan string) {
 				return
 			}
 
+			text := fmt.Sprintf("%v%v", ctx.prefix, scanner.Text())
 			select {
-			case tmp <- scanner.Text():
+			case tmp <- text:
 			case <-ctx.Closed:
 				log.Debug().Msg("explicitly stop the word producer")
 				return
@@ -54,6 +59,10 @@ func (ctx *ReaderProducer) Produce(wait time.Duration) (ch <-chan string) {
 
 	ch = tmp
 	return
+}
+
+func (ctx *ReaderProducer) Prefix(prefix string) {
+	ctx.prefix = prefix
 }
 
 // explicitly close the current producer
