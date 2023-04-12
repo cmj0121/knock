@@ -37,6 +37,11 @@ a method for you to **brute-force** some information by your word generator.
 
 ### Support Word Generator
 
+The producer is used to generator word by specified purpose. It can generate
+the words by the optional arguments.
+
+For example, `--ip STRING` is used to generate the IP address with **IP/mask** format.
+
 | optional                   | description                             |
 |----------------------------|-----------------------------------------|
 | -f FILE, --file=FILE       | read the external wordlist file         |
