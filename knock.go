@@ -31,6 +31,7 @@ type Knock struct {
 	IP     string        `xor:"file,ip,regexp" group:"producer" short:"i" help:"The valid IP/mask"`
 	Regexp string        `xor:"file,ip,regexp" group:"producer" short:"r" help:"The regexp pattern"`
 	Prefix string        `group:"producer" help:"The prefix of the token"`
+	Suffix string        `group:"producer" help:"The suffix of the token"`
 
 	// the logger options
 	Quiet        bool `short:"q" group:"logger" xor:"verbose,quiet" help:"Disable all logger."`
@@ -76,8 +77,9 @@ func (knock *Knock) run() (exitcode int) {
 			return 1
 		}
 	}
-	// set the prefix of the word list
+	// set the prefix and suffix of the word list
 	p.Prefix(knock.Prefix)
+	p.Suffix(knock.Suffix)
 
 	if manager, err := task.New(knock.Name); err != nil {
 		log.Error().Err(err).Str("name", knock.Name)
