@@ -27,9 +27,9 @@ type Knock struct {
 
 	// the external wordlist
 	Wait   time.Duration `default:"25ms" short:"W" help:"The duration per generate word"`
-	File   *os.File      `required:"" xor:"file,ip,regexp" group:"producer" short:"f" help:"The external word-list file."`
-	IP     string        `required:"" xor:"file,ip,regexp" group:"producer" short:"i" help:"The valid IP/mask"`
-	Regexp string        `required:"" xor:"file,ip,regexp" group:"producer" short:"r" help:"The regexp pattern"`
+	File   *os.File      `xor:"file,ip,regexp" group:"producer" short:"f" help:"The external word-list file."`
+	IP     string        `xor:"file,ip,regexp" group:"producer" short:"i" help:"The valid IP/mask"`
+	Regexp string        `xor:"file,ip,regexp" group:"producer" short:"r" help:"The regexp pattern"`
 	Prefix string        `group:"producer" help:"The prefix of the token"`
 	Suffix string        `group:"producer" help:"The suffix of the token"`
 
@@ -69,13 +69,15 @@ func (knock *Knock) run() (exitcode int) {
 			log.Error().Err(err).Msg("invalid regexp")
 			return 1
 		}
-	default:
+	case knock.IP != "":
 		var err error
 
 		if p, err = producer.NewCIDRProducer(knock.IP); err != nil {
 			log.Error().Err(err).Msg("invalid IP")
 			return 1
 		}
+	default:
+		p = producer.NewDefaultProducer()
 	}
 	// set the prefix and suffix of the word list
 	p.Prefix(knock.Prefix)
