@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -14,10 +15,6 @@ import (
 func init() {
 	worker := &SubPath{
 		Client: &http.Client{
-			// disable auto-redirect
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
 			// allow insecure HTTPs
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -31,7 +28,9 @@ func init() {
 type SubPath struct {
 	*http.Client
 
-	url *url.URL
+	url       *url.URL
+	final_url string
+	final_txt []byte
 }
 
 // the unique name of worker
@@ -63,7 +62,24 @@ func (ctx *SubPath) Open(args ...string) (err error) {
 	default:
 		err = fmt.Errorf("should pass one and only one hostname to the command %#v", ctx.Name())
 	}
+
+	ctx.epologue()
 	return
+}
+
+func (ctx *SubPath) epologue() {
+	path := fmt.Sprintf("%v/abcdefg", ctx.url)
+	if resp, err := http.Get(path); err == nil {
+		final_url := resp.Request.URL.String()
+		if resp.StatusCode == 200 && path != final_url {
+			defer resp.Body.Close()
+
+			data, _ := io.ReadAll(resp.Body)
+
+			ctx.final_url = final_url
+			ctx.final_txt = data
+		}
+	}
 }
 
 // the dummy close method
@@ -90,8 +106,9 @@ func (ctx *SubPath) Run(producer <-chan string) (err error) {
 // copy the current worker settings and generate a new instance
 func (ctx *SubPath) Dup() (worker Worker) {
 	worker = &SubPath{
-		Client: ctx.Client,
-		url:    ctx.url,
+		Client:    ctx.Client,
+		url:       ctx.url,
+		final_url: ctx.final_url,
 	}
 	return
 }
@@ -110,10 +127,14 @@ func (ctx *SubPath) check(url, method string) (code int) {
 		case 404:
 		case 405:
 		default:
-			size, _ := io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
+			final_url := resp.Request.URL.String()
+			data, _ := io.ReadAll(resp.Body)
 
-			progress.AddText("%-6v %v %v (%v)", method, resp.StatusCode, url, size)
+			if final_url != ctx.final_url && bytes.Equal(data, ctx.final_txt) {
+				progress.AddText("%-6v %v %v (%v)", method, resp.StatusCode, url, len(data))
+			}
+
+			resp.Body.Close()
 		}
 	default:
 		progress.AddError(err)
